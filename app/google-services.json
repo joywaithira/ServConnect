@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "320096992182",
+    "project_id": "servconnect-7a598",
+    "storage_bucket": "servconnect-7a598.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320096992182:android:fd8dbe2f28a62131f81f17",
+        "android_client_info": {
+          "package_name": "com.maryjoy.servconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrjmI2y_NTdZ9GKK6SJlV149hS-rOKFDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
