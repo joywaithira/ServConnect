@@ -1,4 +1,4 @@
-package com.maryjoy.servconnect.screens.onboarding
+package com.maryjoy.servconnect.ui.screens.practise
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,8 +8,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 
+
 @Composable
-fun LoginScreen(navController: NavController){
+fun PaymentScreen(navController: NavController){
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -24,9 +25,9 @@ fun LoginScreen(navController: NavController){
 
 @Preview(showBackground = true)
 @Composable
-fun LoginScreenPreview(){
+fun PaymentScreenPreview(){
 
-    LoginScreen(rememberNavController())
+    PaymentScreen(rememberNavController())
 
 
 }
