@@ -1,4 +1,4 @@
-package com.maryjoy.servconnect.ui.screens.shared.auth
+package com.maryjoy.servconnect.ui.screens.auth
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -13,8 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -29,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,8 +45,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.maryjoy.servconnect.R
 import com.maryjoy.servconnect.ui.screens.navigation.ROUT_HOME
-import com.maryjoy.servconnect.ui.screens.navigation.ROUT_REGISTER
-import com.maryjoy.servconnect.ui.screens.navigation.ROUT_ORG_HOME
+import com.maryjoy.servconnect.ui.screens.navigation.ROUT_LOGIN
+import com.maryjoy.servconnect.ui.screens.shared.auth.SectionLabel
 import kotlinx.coroutines.launch
 
 // ── Brand Colors ──────────────────────────────────────────────
@@ -61,22 +62,28 @@ private val FieldBorder   = Color(0xFFE0E0E0)
 private val ErrorRed      = Color(0xFFD32F2F)
 
 @Composable
-fun LoginScreen(navController: NavController) {
+fun VolunteerRegisterScreen(navController: NavController) {
 
     // ── Form State ────────────────────────────────────────────
-    // Holds whatever the user types into each field
-    var email           by remember { mutableStateOf("") }
-    var password        by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+    // These hold whatever the user types into each field
+    var fullName             by remember { mutableStateOf("") }
+    var email                by remember { mutableStateOf("") }
+    var password             by remember { mutableStateOf("") }
+    var confirmPassword      by remember { mutableStateOf("") }
+    var passwordVisible      by remember { mutableStateOf(false) }
+    var confirmPassVisible   by remember { mutableStateOf(false) }
 
-    // ── Error & Loading State ─────────────────────────────────
-    var emailError    by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf("") }
-    var firebaseError by remember { mutableStateOf("") }
-    var isLoading     by remember { mutableStateOf(false) }
+    // ── Error State ───────────────────────────────────────────
+    // Each field has its own error shown below it when invalid
+    var fullNameError        by remember { mutableStateOf("") }
+    var emailError           by remember { mutableStateOf("") }
+    var passwordError        by remember { mutableStateOf("") }
+    var confirmPasswordError by remember { mutableStateOf("") }
+    var firebaseError        by remember { mutableStateOf("") }
+    var isLoading            by remember { mutableStateOf(false) }
 
     // ── Entrance Animations ───────────────────────────────────
-    // Staggered fade-in and slide-up on screen open
+    // Fade-in and slide-up effect when the screen first opens
     val headerAlpha = remember { Animatable(0f) }
     val formAlpha   = remember { Animatable(0f) }
     val formSlide   = remember { Animatable(50f) }
@@ -84,22 +91,23 @@ fun LoginScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         launch { headerAlpha.animateTo(1f, tween(600, easing = FastOutSlowInEasing)) }
         launch { formAlpha.animateTo(1f, tween(700, delayMillis = 300)) }
-        launch {
-            formSlide.animateTo(
-                0f, tween(700, delayMillis = 300, easing = FastOutSlowInEasing)
-            )
-        }
+        launch { formSlide.animateTo(0f, tween(700, delayMillis = 300, easing = FastOutSlowInEasing)) }
     }
 
     // ── Validation ────────────────────────────────────────────
-    // Catches empty or badly formatted fields before
-    // we make any Firebase call — saves unnecessary API usage
+    // Runs before Firebase is called to catch empty or
+    // incorrectly filled fields early without wasting an API call
     fun validate(): Boolean {
         var valid = true
 
+        fullNameError = when {
+            fullName.isBlank()         -> { valid = false; "Full name is required" }
+            fullName.trim().length < 3 -> { valid = false; "Name must be at least 3 characters" }
+            else -> ""
+        }
+
         emailError = when {
-            email.isBlank() ->
-            { valid = false; "Email address is required" }
+            email.isBlank() -> { valid = false; "Email address is required" }
             !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
             { valid = false; "Enter a valid email address" }
             else -> ""
@@ -111,115 +119,90 @@ fun LoginScreen(navController: NavController) {
             else -> ""
         }
 
+        confirmPasswordError = when {
+            confirmPassword.isBlank()   -> { valid = false; "Please confirm your password" }
+            confirmPassword != password -> { valid = false; "Passwords do not match" }
+            else -> ""
+        }
+
         return valid
     }
 
-    // ── Firebase Login ────────────────────────────────────────
-    // Called only after validate() returns true.
-    // After signing in we check Firestore to find out if
-    // this user is a "volunteer" or "organization" and
-    // navigate them to the correct home screen.
-    fun loginUser() {
+    // ── Firebase Registration ─────────────────────────────────
+    // This function is only called after validate() returns true
+    fun registerVolunteer() {
         isLoading = true
         firebaseError = ""
 
-        // Step 1: Sign in with Firebase Auth using
-        // the email and password the user typed
+        // Step 1: Create the auth account with email and password.
+        // Firebase Auth stores the login credentials securely.
         FirebaseAuth.getInstance()
-            .signInWithEmailAndPassword(email.trim(), password)
+            .createUserWithEmailAndPassword(email.trim(), password)
             .addOnSuccessListener { authResult ->
 
-                // Step 2: Get the uid of the logged-in user
+                // Step 2: Get the unique ID Firebase assigned
+                // to this new account. Every user has one uid.
                 val uid = authResult.user?.uid ?: run {
                     isLoading = false
                     firebaseError = "Something went wrong. Please try again."
                     return@addOnSuccessListener
                 }
 
-                // Step 3: Check the "users" collection first
-                // to see if this uid belongs to a volunteer
+                // Step 3: Build the volunteer profile map.
+                // This is the data that will be saved in Firestore
+                // and used across the app (name on certificates,
+                // portfolio, bookings etc.)
+                val volunteerProfile = hashMapOf(
+                    "uid"         to uid,
+                    "fullName"    to fullName.trim(),
+                    "email"       to email.trim(),
+                    "role"        to "volunteer",
+
+                    // These fields start empty and get filled
+                    // as the volunteer uses the app
+                    "interests"   to emptyList<String>(),
+                    "skills"      to emptyList<String>(),
+                    "location"    to "",
+                    "totalHours"  to 0,
+                    "createdAt"   to System.currentTimeMillis()
+                )
+
+                // Step 4: Save the profile to the "users" collection
+                // in Firestore. The document ID is the uid so we
+                // can always find this volunteer by their auth uid.
                 FirebaseFirestore.getInstance()
                     .collection("users")
                     .document(uid)
-                    .get()
-                    .addOnSuccessListener { volunteerDoc ->
+                    .set(volunteerProfile)
+                    .addOnSuccessListener {
 
-                        if (volunteerDoc.exists()) {
-                            // This uid is a volunteer —
-                            // send them to the volunteer home screen
-                            isLoading = false
-                            navController.navigate(ROUT_HOME) {
-                                // Clear the back stack so they
-                                // cannot go back to login
-                                popUpTo(0) { inclusive = true }
-                            }
-                        } else {
-                            // Not found in "users" — check the
-                            // "organizations" collection instead
-                            FirebaseFirestore.getInstance()
-                                .collection("organizations")
-                                .document(uid)
-                                .get()
-                                .addOnSuccessListener { orgDoc ->
-
-                                    if (orgDoc.exists()) {
-                                        // This uid is an organization.
-                                        // Check their verification status
-                                        // before deciding where to send them
-                                        val status = orgDoc.getString("status") ?: "pending"
-
-                                        isLoading = false
-
-                                        if (status == "pending") {
-                                            // Still waiting for admin approval —
-                                            // send to the pending screen
-                                            navController.navigate("pending_verification") {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        } else {
-                                            // Verified organization —
-                                            // send to the org home screen
-                                            navController.navigate(ROUT_ORG_HOME) {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        }
-                                    } else {
-                                        // uid not found in either collection —
-                                        // this should not normally happen
-                                        isLoading = false
-                                        firebaseError =
-                                            "Account not found. Please register first."
-                                    }
-                                }
-                                .addOnFailureListener { e ->
-                                    isLoading = false
-                                    firebaseError = "Error: ${e.message}"
-                                }
+                        // Step 5: Everything worked.
+                        // Navigate to the home screen and clear
+                        // the back stack so the user cannot press
+                        // back and return to the registration form.
+                        isLoading = false
+                        navController.navigate(ROUT_HOME) {
+                            popUpTo(0) { inclusive = true }
                         }
                     }
                     .addOnFailureListener { e ->
+                        // Firestore save failed even though the
+                        // auth account was created. Show the error.
                         isLoading = false
-                        firebaseError = "Error fetching profile: ${e.message}"
+                        firebaseError = "Failed to save your profile. ${e.message}"
                     }
             }
             .addOnFailureListener { e ->
-                // Firebase Auth sign in failed.
+                // Firebase Auth account creation failed.
                 // Map Firebase error messages to friendly ones.
                 isLoading = false
                 firebaseError = when {
-                    e.message?.contains("no user record") == true ||
-                            e.message?.contains("user not found") == true ->
-                        "No account found with this email"
-                    e.message?.contains("password is invalid") == true ||
-                            e.message?.contains("wrong password") == true ->
-                        "Incorrect password. Please try again"
+                    e.message?.contains("email address is already in use") == true ->
+                        "An account with this email already exists"
                     e.message?.contains("network") == true ->
                         "No internet connection. Please try again"
-                    e.message?.contains("blocked") == true ||
-                            e.message?.contains("too many") == true ->
-                        "Too many failed attempts. Please try again later"
                     else ->
-                        e.message ?: "Login failed. Please try again"
+                        e.message ?: "Registration failed. Please try again"
                 }
             }
     }
@@ -235,7 +218,7 @@ fun LoginScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .height(290.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(DarkOlive, PrimaryOlive)
@@ -247,7 +230,7 @@ fun LoginScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp),
+                .height(290.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Box(
@@ -266,7 +249,31 @@ fun LoginScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Spacer(modifier = Modifier.height(52.dp))
+            // ── Back Button ────────────────────────────────────
+            // Takes the user back to the role picker screen
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                    .alpha(headerAlpha.value),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(WhiteBg.copy(alpha = 0.15f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = SecondaryGold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             // ── Header ─────────────────────────────────────────
             Column(
@@ -278,31 +285,40 @@ fun LoginScreen(navController: NavController) {
                 Image(
                     painter = painterResource(id = R.drawable.logo_servconnect),
                     contentDescription = "ServConnect Logo",
-                    modifier = Modifier.size(115.dp),
+                    modifier = Modifier.size(100.dp),
                     contentScale = ContentScale.Fit
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Welcome Back",
+                    text = "Volunteer Registration",
                     color = SecondaryGold,
-                    fontSize = 28.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.4.sp
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                Text(
-                    text = "The Bridge to a Better Community",
-                    color = SecondaryGold.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontStyle = FontStyle.Italic
-                )
+                // Green badge — distinguishes from org flow
+                // which uses an orange badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SecondaryGold.copy(alpha = 0.2f))
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "🤝  Joining as a Volunteer",
+                        color = SecondaryGold,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // ── Form Card ──────────────────────────────────────
             Card(
@@ -327,15 +343,27 @@ fun LoginScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
 
-                    // Section label
+                    // ── Section 1: Personal Information ────────
                     SectionLabel(
-                        title = "Sign In to Your Account",
+                        title = "Personal Information",
                         color = PrimaryOlive
                     )
 
-                    // ── Email Field ────────────────────────────
-                    // Firebase uses this to identify the account
-                    LoginField(
+                    // Full Name field
+                    // Collected here then saved to Firestore as
+                    // "fullName" — used on certificates & portfolio
+                    VolunteerField(
+                        value = fullName,
+                        onValueChange = { fullName = it; fullNameError = "" },
+                        label = "Full Name",
+                        placeholder = "e.g. Jane Wanjiku",
+                        icon = Icons.Default.Person,
+                        error = fullNameError
+                    )
+
+                    // Email field
+                    // Used as the Firebase Auth login credential
+                    VolunteerField(
                         value = email,
                         onValueChange = { email = it; emailError = "" },
                         label = "Email Address",
@@ -345,13 +373,19 @@ fun LoginScreen(navController: NavController) {
                         keyboardType = KeyboardType.Email
                     )
 
-                    // ── Password Field ─────────────────────────
-                    // Eye icon toggles password visibility
-                    LoginField(
+                    // ── Section 2: Account Security ────────────
+                    SectionLabel(
+                        title = "Secure Your Account",
+                        color = PrimaryOlive
+                    )
+
+                    // Password field
+                    // The eye icon toggles between hidden and visible
+                    VolunteerField(
                         value = password,
                         onValueChange = { password = it; passwordError = "" },
                         label = "Password",
-                        placeholder = "Enter your password",
+                        placeholder = "At least 8 characters",
                         icon = Icons.Default.Lock,
                         error = passwordError,
                         isPassword = true,
@@ -359,70 +393,100 @@ fun LoginScreen(navController: NavController) {
                         onTogglePassword = { passwordVisible = !passwordVisible }
                     )
 
-                    // ── Forgot Password ────────────────────────
-                    // Sends a password reset email via Firebase Auth
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Forgot Password?",
-                            color = AccentOrange,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .clickable {
-                                    // Only send reset if email is filled
-                                    if (email.isNotBlank()) {
-                                        FirebaseAuth
-                                            .getInstance()
-                                            .sendPasswordResetEmail(email.trim())
-                                        firebaseError =
-                                            "✅ Password reset email sent to $email"
-                                    } else {
-                                        emailError =
-                                            "Enter your email first to reset password"
-                                    }
-                                }
-                        )
+                    // Strength bar appears as soon as user starts typing
+                    // Weak = red, Medium = orange, Strong = green
+                    if (password.isNotEmpty()) {
+                        VolunteerPasswordStrength(password = password)
+                    }
+
+                    // Confirm password — must match the field above
+                    VolunteerField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it; confirmPasswordError = "" },
+                        label = "Confirm Password",
+                        placeholder = "Re-enter your password",
+                        icon = Icons.Default.Lock,
+                        error = confirmPasswordError,
+                        isPassword = true,
+                        passwordVisible = confirmPassVisible,
+                        onTogglePassword = { confirmPassVisible = !confirmPassVisible }
+                    )
+
+                    // ── What you get info box ───────────────────
+                    // Motivates the user to complete sign up by
+                    // showing them the benefits of joining
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(LightGold)
+                            .border(
+                                1.dp,
+                                PrimaryOlive.copy(alpha = 0.3f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "✦  What you get as a volunteer",
+                                color = PrimaryOlive,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "• Browse & book volunteer opportunities\n" +
+                                        "• Earn verified certificates of service\n" +
+                                        "• Build your personal service portfolio\n" +
+                                        "• Get matched by location & interest",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
                     }
 
                     // ── Firebase Error Display ──────────────────
-                    // Shows errors from Firebase —
-                    // wrong password, no account, no internet etc.
-                    // Also used to confirm password reset email sent
+                    // Only visible when Firebase returns an error
+                    // e.g. email already in use, no internet etc.
                     if (firebaseError.isNotEmpty()) {
-                        val isSuccess = firebaseError.startsWith("✅")
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isSuccess) Color(0xFF388E3C).copy(alpha = 0.08f)
-                                    else ErrorRed.copy(alpha = 0.08f)
-                                )
+                                .background(ErrorRed.copy(alpha = 0.08f))
                                 .border(
                                     1.dp,
-                                    if (isSuccess) Color(0xFF388E3C).copy(alpha = 0.3f)
-                                    else ErrorRed.copy(alpha = 0.3f),
+                                    ErrorRed.copy(alpha = 0.3f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .padding(12.dp)
                         ) {
                             Text(
-                                text = firebaseError,
-                                color = if (isSuccess) Color(0xFF388E3C) else ErrorRed,
+                                text = "⚠ $firebaseError",
+                                color = ErrorRed,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    // ── Login Button ───────────────────────────
-                    // Validates first then calls loginUser()
-                    // which checks role and routes accordingly
+                    // ── Terms ───────────────────────────────────
+                    Text(
+                        text = "By creating an account you agree to our\nTerms of Service and Privacy Policy.",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // ── Register Button ─────────────────────────
+                    // First validates locally then calls Firebase
                     Button(
                         onClick = {
                             if (validate()) {
-                                loginUser()
+                                registerVolunteer()
                             }
                         },
                         modifier = Modifier
@@ -444,11 +508,11 @@ fun LoginScreen(navController: NavController) {
                             )
                         } else {
                             Text(
-                                text = "Sign In",
+                                text = "Create Volunteer Account",
                                 color = SecondaryGold,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
+                                letterSpacing = 0.6.sp
                             )
                         }
                     }
@@ -463,40 +527,27 @@ fun LoginScreen(navController: NavController) {
                         HorizontalDivider(modifier = Modifier.weight(1f), color = FieldBorder)
                     }
 
-                    // ── Register redirect ──────────────────────
-                    // Takes new users to the role picker screen
+                    // ── Sign in redirect ───────────────────────
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Don't have an account? ",
+                            text = "Already have an account? ",
                             color = TextMuted,
                             fontSize = 13.sp
                         )
                         Text(
-                            text = "Sign Up",
+                            text = "Sign In",
                             color = AccentOrange,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
-                                navController.navigate(ROUT_REGISTER)
+                                navController.navigate(ROUT_LOGIN)
                             }
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Tagline at the bottom of the card
-                    Text(
-                        text = "The Bridge to a Better Community",
-                        color = TextMuted,
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
 
@@ -505,11 +556,11 @@ fun LoginScreen(navController: NavController) {
     }
 }
 
-// ── Login Text Field ──────────────────────────────────────────
-// Same branded field pattern used across all auth screens.
-// Border and label turn olive when filled, red on error.
+// ── Volunteer Text Field ──────────────────────────────────────
+// Reusable branded field — olive green accent color
+// Border turns olive when filled, red when there's an error
 @Composable
-fun LoginField(
+fun VolunteerField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -532,6 +583,7 @@ fun LoginField(
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(
             text = label,
+            // Label turns olive when the field has content
             color = if (isFilled) PrimaryOlive else TextDark,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
@@ -550,6 +602,7 @@ fun LoginField(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
+                    // Icon also turns olive when field is filled
                     tint = if (isFilled) PrimaryOlive else TextMuted,
                     modifier = Modifier.size(20.dp)
                 )
@@ -576,6 +629,7 @@ fun LoginField(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor      = Color.Transparent,
                 unfocusedBorderColor    = Color.Transparent,
+                // Light gold tint when focused — matches brand
                 focusedContainerColor   = LightGold.copy(alpha = 0.5f),
                 unfocusedContainerColor = Color(0xFFF9F9F9),
                 cursorColor             = PrimaryOlive,
@@ -584,6 +638,7 @@ fun LoginField(
             )
         )
 
+        // Error message shown below the field
         if (hasError) {
             Text(
                 text = "⚠ $error",
@@ -595,8 +650,56 @@ fun LoginField(
     }
 }
 
+// ── Password Strength Indicator ───────────────────────────────
+// 3-segment bar that fills based on password complexity:
+// 1 bar = Weak (red), 2 bars = Medium (orange), 3 bars = Strong (green)
+@Composable
+fun VolunteerPasswordStrength(password: String) {
+    val strength = when {
+        password.length >= 12 &&
+                password.any { it.isUpperCase() } &&
+                password.any { it.isDigit() } &&
+                password.any { !it.isLetterOrDigit() } -> 3
+
+        password.length >= 8 &&
+                (password.any { it.isUpperCase() } || password.any { it.isDigit() }) -> 2
+
+        else -> 1
+    }
+
+    val (label, color) = when (strength) {
+        3    -> "Strong 💪" to Color(0xFF388E3C)
+        2    -> "Medium"    to AccentOrange
+        else -> "Weak"      to ErrorRed
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            repeat(3) { index ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (index < strength) color else FieldBorder)
+                )
+            }
+        }
+        Text(
+            text = "Password strength: $label",
+            color = color,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(start = 2.dp)
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
-fun LoginScreenPreview() {
-    LoginScreen(rememberNavController())
+fun VolunteerRegisterScreenPreview() {
+    VolunteerRegisterScreen(rememberNavController())
 }
