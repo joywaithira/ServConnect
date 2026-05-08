@@ -12,3 +12,17 @@ val Pink40 = Color(0xFF7D5260)
 val yellow = Color(0xFFF3DF90)
 val bellow = Color(0xFF676B2C)
 val hellow = Color(0xFFFF5722)
+val PrimaryColor = Color(0xFF676B2C)
+val SecondaryColor = Color(0xFFF3DF90)
+val AccentColor = Color(0xFFFF5722)
+val BackgroundColor = Color(0xFFF8F9FA)
+val TextPrimary = Color(0xFF1D1D1D)
+val TextSecondary = Color(0xFF757575)
+
+
+
+
+
+
+
+

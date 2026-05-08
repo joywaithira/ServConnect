@@ -60,6 +60,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("io.coil-kt:coil-compose:2.4.0") // For AsyncImage (Profile Picture)
+    implementation("androidx.compose.material:material-icons-extended") // For extended icons
 
     //Navigation
     implementation("androidx.navigation:navigation-runtime-ktx:2.9.4")
@@ -68,6 +70,6 @@ dependencies {
 
     // QR code generation
     implementation("com.google.zxing:core:3.5.2")
-    implementation("androidx.compose.ui:ui-graphics:1.6.0")
+    implementation(libs.androidx.compose.ui.graphics)
 
 }

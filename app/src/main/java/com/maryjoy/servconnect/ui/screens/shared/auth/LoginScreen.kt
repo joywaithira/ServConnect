@@ -1,596 +1,259 @@
 package com.maryjoy.servconnect.ui.screens.shared.auth
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase
 import com.maryjoy.servconnect.R
-import com.maryjoy.servconnect.ui.screens.navigation.ROUT_HOME
-import com.maryjoy.servconnect.ui.screens.navigation.ROUT_REGISTER
-import com.maryjoy.servconnect.ui.screens.navigation.ROUT_ORG_HOME
-import kotlinx.coroutines.launch
+import com.maryjoy.servconnect.ui.theme.PrimaryColor
 
-// ── Brand Colors ──────────────────────────────────────────────
-private val PrimaryOlive  = Color(0xFF676B2C)
-private val SecondaryGold = Color(0xFFF3DF90)
-private val AccentOrange  = Color(0xFFFF5722)
-private val DarkOlive     = Color(0xFF3D4019)
-private val LightGold     = Color(0xFFFDF6DC)
-private val TextDark      = Color(0xFF1C1C1C)
-private val TextMuted     = Color(0xFF7A7A7A)
-private val WhiteBg       = Color(0xFFFFFFFF)
-private val FieldBorder   = Color(0xFFE0E0E0)
-private val ErrorRed      = Color(0xFFD32F2F)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavController) {
-
-    // ── Form State ────────────────────────────────────────────
-    // Holds whatever the user types into each field
-    var email           by remember { mutableStateOf("") }
-    var password        by remember { mutableStateOf("") }
+fun LoginScreen(
+    onNavigateToRegister: () -> Unit,
+    onLoginSuccess: (Boolean) -> Unit // Boolean: true for Org, false for Volunteer
+) {
+    val context = LocalContext.current
+    val isPreview = LocalInspectionMode.current
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    val auth = remember { if (isPreview) null else FirebaseAuth.getInstance() }
+    val database = remember { if (isPreview) null else FirebaseDatabase.getInstance() }
 
-    // ── Error & Loading State ─────────────────────────────────
-    var emailError    by remember { mutableStateOf("") }
-    var passwordError by remember { mutableStateOf("") }
-    var firebaseError by remember { mutableStateOf("") }
-    var isLoading     by remember { mutableStateOf(false) }
-
-    // ── Entrance Animations ───────────────────────────────────
-    // Staggered fade-in and slide-up on screen open
-    val headerAlpha = remember { Animatable(0f) }
-    val formAlpha   = remember { Animatable(0f) }
-    val formSlide   = remember { Animatable(50f) }
-
-    LaunchedEffect(Unit) {
-        launch { headerAlpha.animateTo(1f, tween(600, easing = FastOutSlowInEasing)) }
-        launch { formAlpha.animateTo(1f, tween(700, delayMillis = 300)) }
-        launch {
-            formSlide.animateTo(
-                0f, tween(700, delayMillis = 300, easing = FastOutSlowInEasing)
-            )
-        }
-    }
-
-    // ── Validation ────────────────────────────────────────────
-    // Catches empty or badly formatted fields before
-    // we make any Firebase call — saves unnecessary API usage
-    fun validate(): Boolean {
-        var valid = true
-
-        emailError = when {
-            email.isBlank() ->
-            { valid = false; "Email address is required" }
-            !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches() ->
-            { valid = false; "Enter a valid email address" }
-            else -> ""
-        }
-
-        passwordError = when {
-            password.isBlank()  -> { valid = false; "Password is required" }
-            password.length < 8 -> { valid = false; "Password must be at least 8 characters" }
-            else -> ""
-        }
-
-        return valid
-    }
-
-    // ── Firebase Login ────────────────────────────────────────
-    // Called only after validate() returns true.
-    // After signing in we check Firestore to find out if
-    // this user is a "volunteer" or "organization" and
-    // navigate them to the correct home screen.
-    fun loginUser() {
-        isLoading = true
-        firebaseError = ""
-
-        // Step 1: Sign in with Firebase Auth using
-        // the email and password the user typed
-        FirebaseAuth.getInstance()
-            .signInWithEmailAndPassword(email.trim(), password)
-            .addOnSuccessListener { authResult ->
-
-                // Step 2: Get the uid of the logged-in user
-                val uid = authResult.user?.uid ?: run {
-                    isLoading = false
-                    firebaseError = "Something went wrong. Please try again."
-                    return@addOnSuccessListener
-                }
-
-                // Step 3: Check the "users" collection first
-                // to see if this uid belongs to a volunteer
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(uid)
-                    .get()
-                    .addOnSuccessListener { volunteerDoc ->
-
-                        if (volunteerDoc.exists()) {
-                            // This uid is a volunteer —
-                            // send them to the volunteer home screen
-                            isLoading = false
-                            navController.navigate(ROUT_HOME) {
-                                // Clear the back stack so they
-                                // cannot go back to login
-                                popUpTo(0) { inclusive = true }
-                            }
-                        } else {
-                            // Not found in "users" — check the
-                            // "organizations" collection instead
-                            FirebaseFirestore.getInstance()
-                                .collection("organizations")
-                                .document(uid)
-                                .get()
-                                .addOnSuccessListener { orgDoc ->
-
-                                    if (orgDoc.exists()) {
-                                        // This uid is an organization.
-                                        // Check their verification status
-                                        // before deciding where to send them
-                                        val status = orgDoc.getString("status") ?: "pending"
-
-                                        isLoading = false
-
-                                        if (status == "pending") {
-                                            // Still waiting for admin approval —
-                                            // send to the pending screen
-                                            navController.navigate("pending_verification") {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        } else {
-                                            // Verified organization —
-                                            // send to the org home screen
-                                            navController.navigate(ROUT_ORG_HOME) {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        }
-                                    } else {
-                                        // uid not found in either collection —
-                                        // this should not normally happen
-                                        isLoading = false
-                                        firebaseError =
-                                            "Account not found. Please register first."
-                                    }
-                                }
-                                .addOnFailureListener { e ->
-                                    isLoading = false
-                                    firebaseError = "Error: ${e.message}"
-                                }
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        isLoading = false
-                        firebaseError = "Error fetching profile: ${e.message}"
-                    }
-            }
-            .addOnFailureListener { e ->
-                // Firebase Auth sign in failed.
-                // Map Firebase error messages to friendly ones.
-                isLoading = false
-                firebaseError = when {
-                    e.message?.contains("no user record") == true ||
-                            e.message?.contains("user not found") == true ->
-                        "No account found with this email"
-                    e.message?.contains("password is invalid") == true ||
-                            e.message?.contains("wrong password") == true ->
-                        "Incorrect password. Please try again"
-                    e.message?.contains("network") == true ->
-                        "No internet connection. Please try again"
-                    e.message?.contains("blocked") == true ||
-                            e.message?.contains("too many") == true ->
-                        "Too many failed attempts. Please try again later"
-                    else ->
-                        e.message ?: "Login failed. Please try again"
-                }
-            }
-    }
-
-    // ── UI ────────────────────────────────────────────────────
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(WhiteBg)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-
-        // Olive gradient header band
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(DarkOlive, PrimaryOlive)
-                    )
-                )
+        // Logo
+        Image(
+            painter = painterResource(id = R.drawable.logo_servconnect2),
+            contentDescription = "Logo",
+            modifier = Modifier.size(120.dp)
         )
 
-        // White curved cutout at bottom of header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(topStart = 48.dp, topEnd = 48.dp))
-                    .background(WhiteBg)
-            )
-        }
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Spacer(modifier = Modifier.height(52.dp))
-
-            // ── Header ─────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(headerAlpha.value),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_servconnect),
-                    contentDescription = "ServConnect Logo",
-                    modifier = Modifier.size(115.dp),
-                    contentScale = ContentScale.Fit
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "Welcome Back",
-                    color = SecondaryGold,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.4.sp
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = "The Bridge to a Better Community",
-                    color = SecondaryGold.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontStyle = FontStyle.Italic
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── Form Card ──────────────────────────────────────
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .offset(y = formSlide.value.dp)
-                    .alpha(formAlpha.value)
-                    .shadow(
-                        elevation = 16.dp,
-                        shape = RoundedCornerShape(24.dp),
-                        ambientColor = PrimaryOlive.copy(alpha = 0.12f),
-                        spotColor = PrimaryOlive.copy(alpha = 0.12f)
-                    ),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = WhiteBg)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-
-                    // Section label
-                    SectionLabel(
-                        title = "Sign In to Your Account",
-                        color = PrimaryOlive
-                    )
-
-                    // ── Email Field ────────────────────────────
-                    // Firebase uses this to identify the account
-                    LoginField(
-                        value = email,
-                        onValueChange = { email = it; emailError = "" },
-                        label = "Email Address",
-                        placeholder = "you@example.com",
-                        icon = Icons.Default.Email,
-                        error = emailError,
-                        keyboardType = KeyboardType.Email
-                    )
-
-                    // ── Password Field ─────────────────────────
-                    // Eye icon toggles password visibility
-                    LoginField(
-                        value = password,
-                        onValueChange = { password = it; passwordError = "" },
-                        label = "Password",
-                        placeholder = "Enter your password",
-                        icon = Icons.Default.Lock,
-                        error = passwordError,
-                        isPassword = true,
-                        passwordVisible = passwordVisible,
-                        onTogglePassword = { passwordVisible = !passwordVisible }
-                    )
-
-                    // ── Forgot Password ────────────────────────
-                    // Sends a password reset email via Firebase Auth
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Forgot Password?",
-                            color = AccentOrange,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .clickable {
-                                    // Only send reset if email is filled
-                                    if (email.isNotBlank()) {
-                                        FirebaseAuth
-                                            .getInstance()
-                                            .sendPasswordResetEmail(email.trim())
-                                        firebaseError =
-                                            "✅ Password reset email sent to $email"
-                                    } else {
-                                        emailError =
-                                            "Enter your email first to reset password"
-                                    }
-                                }
-                        )
-                    }
-
-                    // ── Firebase Error Display ──────────────────
-                    // Shows errors from Firebase —
-                    // wrong password, no account, no internet etc.
-                    // Also used to confirm password reset email sent
-                    if (firebaseError.isNotEmpty()) {
-                        val isSuccess = firebaseError.startsWith("✅")
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isSuccess) Color(0xFF388E3C).copy(alpha = 0.08f)
-                                    else ErrorRed.copy(alpha = 0.08f)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isSuccess) Color(0xFF388E3C).copy(alpha = 0.3f)
-                                    else ErrorRed.copy(alpha = 0.3f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                text = firebaseError,
-                                color = if (isSuccess) Color(0xFF388E3C) else ErrorRed,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    // ── Login Button ───────────────────────────
-                    // Validates first then calls loginUser()
-                    // which checks role and routes accordingly
-                    Button(
-                        onClick = {
-                            if (validate()) {
-                                loginUser()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryOlive,
-                            disabledContainerColor = PrimaryOlive.copy(alpha = 0.5f)
-                        ),
-                        enabled = !isLoading
-                    ) {
-                        if (isLoading) {
-                            // Spinner shows while Firebase is working
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = SecondaryGold,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = "Sign In",
-                                color = SecondaryGold,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-                    }
-
-                    // ── Divider ────────────────────────────────
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FieldBorder)
-                        Text(text = "  or  ", color = TextMuted, fontSize = 12.sp)
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FieldBorder)
-                    }
-
-                    // ── Register redirect ──────────────────────
-                    // Takes new users to the role picker screen
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Don't have an account? ",
-                            color = TextMuted,
-                            fontSize = 13.sp
-                        )
-                        Text(
-                            text = "Sign Up",
-                            color = AccentOrange,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable {
-                                navController.navigate(ROUT_REGISTER)
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Tagline at the bottom of the card
-                    Text(
-                        text = "The Bridge to a Better Community",
-                        color = TextMuted,
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
-        }
-    }
-}
-
-// ── Login Text Field ──────────────────────────────────────────
-// Same branded field pattern used across all auth screens.
-// Border and label turn olive when filled, red on error.
-@Composable
-fun LoginField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    placeholder: String,
-    icon: ImageVector,
-    error: String = "",
-    isPassword: Boolean = false,
-    passwordVisible: Boolean = false,
-    onTogglePassword: (() -> Unit)? = null,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    val hasError = error.isNotEmpty()
-    val isFilled = value.isNotEmpty()
-    val borderColor = when {
-        hasError -> ErrorRed
-        isFilled -> PrimaryOlive
-        else     -> FieldBorder
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(
-            text = label,
-            color = if (isFilled) PrimaryOlive else TextDark,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
+            text = "Welcome Back",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = PrimaryColor
         )
+
+        Text(
+            text = "Sign in to continue",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
 
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.5.dp, borderColor, RoundedCornerShape(12.dp)),
-            placeholder = {
-                Text(text = placeholder, color = TextMuted, fontSize = 14.sp)
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isFilled) PrimaryOlive else TextMuted,
-                    modifier = Modifier.size(20.dp)
-                )
-            },
-            trailingIcon = if (isPassword) {
-                {
-                    IconButton(onClick = { onTogglePassword?.invoke() }) {
-                        Icon(
-                            imageVector = if (passwordVisible)
-                                Icons.Default.Visibility
-                            else Icons.Default.VisibilityOff,
-                            contentDescription = null,
-                            tint = if (isFilled) PrimaryOlive else TextMuted,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            } else null,
-            visualTransformation = if (isPassword && !passwordVisible)
-                PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            singleLine = true,
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email Address") },
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor      = Color.Transparent,
-                unfocusedBorderColor    = Color.Transparent,
-                focusedContainerColor   = LightGold.copy(alpha = 0.5f),
-                unfocusedContainerColor = Color(0xFFF9F9F9),
-                cursorColor             = PrimaryOlive,
-                focusedTextColor        = TextDark,
-                unfocusedTextColor      = TextDark
-            )
+            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PrimaryColor) }
         )
 
-        if (hasError) {
-            Text(
-                text = "⚠ $error",
-                color = ErrorRed,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 4.dp)
-            )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PrimaryColor) },
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = null,
+                        tint = Color.Gray
+                    )
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(
+            onClick = { /* Forgot Password */ },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Forgot Password?", color = PrimaryColor, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = {
+                if (email.isNotBlank() && password.isNotBlank()) {
+                    if (auth != null && database != null) {
+                        auth.signInWithEmailAndPassword(email, password)
+                            .addOnCompleteListener {
+                                if (it.isSuccessful) {
+                                    val user = auth.currentUser
+                                    user?.let { firebaseUser ->
+                                        val userId = firebaseUser.uid
+                                        // Check if the user is an Organization
+                                        database.getReference("organizations").child(userId).get()
+                                            .addOnSuccessListener {
+                                                if (it.exists()) {
+                                                    val userData = hashMapOf(
+                                                        "email" to firebaseUser.email,
+                                                        "lastLogin" to System.currentTimeMillis(),
+                                                        "type" to "organization"
+                                                    )
+                                                    database.getReference("users").child(userId)
+                                                        .setValue(userData)
+                                                        .addOnCompleteListener { task ->
+                                                            if (task.isSuccessful) {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "Login successful as Organization!",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+                                                                onLoginSuccess(true)
+                                                            } else {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "Failed to update user data: ${task.exception?.message}",
+                                                                    Toast.LENGTH_LONG
+                                                                ).show()
+                                                                Log.e(
+                                                                    "LoginScreen",
+                                                                    "Failed to update user data",
+                                                                    task.exception
+                                                                )
+                                                            }
+                                                        }
+                                                } else {
+                                                    // Check if the user is a Volunteer
+                                                    database.getReference("volunteers")
+                                                        .child(userId).get().addOnSuccessListener {
+                                                        if (it.exists()) {
+                                                            val userData = hashMapOf(
+                                                                "email" to firebaseUser.email,
+                                                                "lastLogin" to System.currentTimeMillis(),
+                                                                "type" to "volunteer"
+                                                            )
+                                                            database.getReference("users")
+                                                                .child(userId).setValue(userData)
+                                                                .addOnCompleteListener { task ->
+                                                                    if (task.isSuccessful) {
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            "Login successful as Volunteer!",
+                                                                            Toast.LENGTH_SHORT
+                                                                        ).show()
+                                                                        onLoginSuccess(false)
+                                                                    } else {
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            "Failed to update user data: ${task.exception?.message}",
+                                                                            Toast.LENGTH_LONG
+                                                                        ).show()
+                                                                        Log.e(
+                                                                            "LoginScreen",
+                                                                            "Failed to update user data",
+                                                                            task.exception
+                                                                        )
+                                                                    }
+                                                                }
+                                                        } else {
+                                                            Toast.makeText(
+                                                                context,
+                                                                "User data not found. Please register.",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                            Log.e(
+                                                                "LoginScreen",
+                                                                "User data not found in organizations or volunteers nodes."
+                                                            )
+                                                        }
+                                                    }.addOnFailureListener {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Failed to retrieve volunteer data: ${it.message}",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                        Log.e(
+                                                            "LoginScreen",
+                                                            "Failed to retrieve volunteer data",
+                                                            it
+                                                        )
+                                                    }
+                                                }
+                                            }.addOnFailureListener {
+                                            Toast.makeText(
+                                                context,
+                                                "Failed to retrieve organization data: ${it.message}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                            Log.e(
+                                                "LoginScreen",
+                                                "Failed to retrieve organization data",
+                                                it
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Authentication failed: ${it.exception?.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    Log.e("LoginScreen", "Authentication failed", it.exception)
+                                }
+                            }
+                    } else {
+                        Toast.makeText(context, "Firebase not available", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor)
+        ) {
+            Text("Login", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Don\'t have an account?", color = Color.Gray)
+            TextButton(onClick = onNavigateToRegister) {
+                Text("Register", color = PrimaryColor, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -598,5 +261,8 @@ fun LoginField(
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
-    LoginScreen(rememberNavController())
+    LoginScreen(
+        onNavigateToRegister = {},
+        onLoginSuccess = {}
+    )
 }

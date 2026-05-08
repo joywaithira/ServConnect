@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -185,8 +186,9 @@ private fun notifStyle(type: NotifType): NotifStyle = when (type) {
 // ─────────────────────────────────────────────
 //  ROOT SCREEN
 // ─────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(navController: NavController) {
+fun NotificationsScreen(onNavigateBack: () -> Unit) {
     var notifications by remember { mutableStateOf(sampleNotifications) }
     var selectedFilter by remember { mutableStateOf("All") }
     var showClearDialog by remember { mutableStateOf(false) }
@@ -203,76 +205,82 @@ fun NotificationsScreen(navController: NavController) {
 
     val unreadCount = notifications.count { !it.isRead }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(SurfaceOffWhite)
-    ) {
-        // ── Header ──
-        NotificationsHeader(
-            unreadCount    = unreadCount,
-            onMarkAllRead  = {
-                notifications = notifications.map { it.copy(isRead = true) }
-            },
-            onClearAll     = { showClearDialog = true }
-        )
-
-        // ── Filter chips ──
-        NotifFilterRow(
-            filters        = filters,
-            selectedFilter = selectedFilter,
-            onFilterChange = { selectedFilter = it },
-            unreadCount    = unreadCount
-        )
-
-        // ── List ──
-        if (filtered.isEmpty()) {
-            NotifEmptyState(filter = selectedFilter)
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    start  = 16.dp,
-                    end    = 16.dp,
-                    top    = 8.dp,
-                    bottom = 100.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Unread group header
-                val unread = filtered.filter { !it.isRead }
-                val read   = filtered.filter { it.isRead }
-
-                if (unread.isNotEmpty()) {
-                    item {
-                        NotifGroupHeader(title = "New", count = unread.size)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Notifications", fontWeight = FontWeight.Bold, color = Color.White) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
-                    items(unread, key = { it.id }) { notif ->
-                        NotifCard(
-                            notification = notif,
-                            onRead       = {
-                                notifications = notifications.map {
-                                    if (it.id == notif.id) it.copy(isRead = true) else it
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryGreen)
+            )
+        },
+        containerColor = SurfaceOffWhite
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // ── Filter chips ──
+            NotifFilterRow(
+                filters        = filters,
+                selectedFilter = selectedFilter,
+                onFilterChange = { selectedFilter = it },
+                unreadCount    = unreadCount
+            )
+
+            // ── List ──
+            if (filtered.isEmpty()) {
+                NotifEmptyState(filter = selectedFilter)
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        start  = 16.dp,
+                        end    = 16.dp,
+                        top    = 8.dp,
+                        bottom = 100.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Unread group header
+                    val unread = filtered.filter { !it.isRead }
+                    val read   = filtered.filter { it.isRead }
+
+                    if (unread.isNotEmpty()) {
+                        item {
+                            NotifGroupHeader(title = "New", count = unread.size)
+                        }
+                        items(unread, key = { it.id }) { notif ->
+                            NotifCard(
+                                notification = notif,
+                                onRead       = {
+                                    notifications = notifications.map {
+                                        if (it.id == notif.id) it.copy(isRead = true) else it
+                                    }
+                                },
+                                onDismiss    = {
+                                    notifications = notifications.filter { it.id != notif.id }
                                 }
-                            },
-                            onDismiss    = {
-                                notifications = notifications.filter { it.id != notif.id }
-                            }
-                        )
+                            )
+                        }
                     }
-                }
 
-                if (read.isNotEmpty()) {
-                    item {
-                        NotifGroupHeader(title = "Earlier", count = read.size)
-                    }
-                    items(read, key = { it.id }) { notif ->
-                        NotifCard(
-                            notification = notif,
-                            onRead       = {},
-                            onDismiss    = {
-                                notifications = notifications.filter { it.id != notif.id }
-                            }
-                        )
+                    if (read.isNotEmpty()) {
+                        item {
+                            NotifGroupHeader(title = "Earlier", count = read.size)
+                        }
+                        items(read, key = { it.id }) { notif ->
+                            NotifCard(
+                                notification = notif,
+                                onRead       = {},
+                                onDismiss    = {
+                                    notifications = notifications.filter { it.id != notif.id }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -849,9 +857,9 @@ fun ClearAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 // ─────────────────────────────────────────────
 //  PREVIEW
 // ─────────────────────────────────────────────
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showBackground = true)
 @Composable
 fun NotificationsScreenPreview() {
-    NotificationsScreen(rememberNavController())
+    NotificationsScreen(onNavigateBack = {})
 }
 

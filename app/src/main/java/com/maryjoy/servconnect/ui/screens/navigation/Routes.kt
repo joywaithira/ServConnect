@@ -1,25 +1,56 @@
 package com.maryjoy.servconnect.ui.screens.navigation
 
-const val ROUT_SPLASH = "splash"
-const val ROUT_HOME = "home"
-const val ROUT_LOGIN = "login"
-const val ROUT_REGISTER = "register"
+sealed class Screen(val route: String) {
+    // Auth & Onboarding
+    object Splash : Screen("splash")
+    object Login : Screen("login")
+    object RegisterSelection : Screen("register_selection")
+    object VolunteerRegister : Screen("volunteer_register")
+    object OrgRegister : Screen("org_register")
+    object PendingVerification : Screen("pending_verification")
+    object PickInterest : Screen("pick_interest")
 
-const val ROUT_REGISTER_ORGANIZATION = "register_organization"
-const val ROUT_PENDING_ORGANIZATION = "pending_verification"
-const val ROUT_REGISTER_VOLUNTEER = "register_volunteer"
-const val ROUT_ORG_HOME = "org_home"
-const val ROUT_PENDING_VERIFICATION = "pending_verification"
-const val ROUT_POST_OPPORTUNITY    = "post_opportunity"
-const val ROUT_MY_OPPORTUNITIES    = "my_opportunities"
-const val ROUT_OPPORTUNITY_DETAIL  = "opportunity_detail"
-const val ROUT_ORG_NOTIFICATIONS   = "org_notifications"
-const val ROUT_ORG_MESSAGES        = "org_messages"
-const val ROUT_ORG_PROFILE         = "org_profile"
-const val ROUT_QR_CODE            = "qr_code"
-const val ROUT_ISSUE_CERTIFICATE  = "issue_certificate"
-const val ROUT_MANAGE_BOOKINGS = "manage_bookings"
-const val ROUT_VOLUNTEER_PROFILE = "volunteer_profile"
+    // Volunteer Path
+    object Home : Screen("home")
+    object Explore : Screen("explore")
+    object MyBookings : Screen("my_bookings")
+    object QrCheckIn : Screen("qr_check_in")
+    object MyProfile : Screen("my_profile")
+    object ServicePortfolio : Screen("service_portfolio")
+    object ActivityHistory : Screen("activity_history")
+    object Settings : Screen("settings")
+    object OpportunityDetail : Screen("opportunity_detail/{opportunityId}") {
+        fun createRoute(opportunityId: String) = "opportunity_detail/$opportunityId"
+    }
 
+    // Organization Path
+    object OrgDashboard : Screen("org_dashboard")
+    object PostOpportunity : Screen("post_opportunity")
+    object MyOpportunities : Screen("my_opportunities")
+    object OrgOpportunityDetail : Screen("org_opportunity_detail/{opportunityId}") {
+        fun createRoute(opportunityId: String) = "org_opportunity_detail/$opportunityId"
+    }
+    object ManageBookings : Screen("manage_bookings/{opportunityId}") {
+        fun createRoute(opportunityId: String) = "manage_bookings/$opportunityId"
+    }
+    object QrCode : Screen("qr_code/{opportunityId}") {
+        fun createRoute(opportunityId: String) = "qr_code/$opportunityId"
+    }
+    object VolunteerProfileView : Screen("volunteer_profile_view/{volunteerId}") {
+        fun createRoute(volunteerId: String) = "volunteer_profile_view/$volunteerId"
+    }
+    object IssueCertificate : Screen("issue_certificate/{volunteerId}/{activityTitle}") {
+        fun createRoute(volunteerId: String, activityTitle: String) = "issue_certificate/$volunteerId/$activityTitle"
+    }
+    object OrgProfile : Screen("org_profile")
 
-
+    // Shared
+    object Messages : Screen("messages")
+    object ChatDetail : Screen("chat_detail/{orgId}/{orgName}") {
+        fun createRoute(orgId: String, orgName: String) = "chat_detail/$orgId/$orgName"
+    }
+    object Notifications : Screen("notifications")
+    object OrgProfileView : Screen("org_profile_view/{orgId}") {
+        fun createRoute(orgId: String) = "org_profile_view/$orgId"
+    }
+}
