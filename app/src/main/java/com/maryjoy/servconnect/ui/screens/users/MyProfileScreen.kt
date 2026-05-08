@@ -191,27 +191,14 @@ fun SkillsAndInterestsSection() {
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // Workaround for Preview: FlowRow can cause NoSuchMethodError in some IDE versions
-        // due to binary incompatibility between the foundation library and LayoutLib.
-        if (androidx.compose.ui.platform.LocalInspectionMode.current) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                skills.chunked(3).forEach { rowSkills ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowSkills.forEach { skill ->
-                            SkillChip(skill)
-                        }
+        // Use a simple Column of Rows to avoid FlowRow binary compatibility issues
+        // which can cause NoSuchMethodError on some devices or versions.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            skills.chunked(3).forEach { rowSkills ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowSkills.forEach { skill ->
+                        SkillChip(skill)
                     }
-                }
-            }
-        } else {
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                skills.forEach { skill ->
-                    SkillChip(skill)
                 }
             }
         }

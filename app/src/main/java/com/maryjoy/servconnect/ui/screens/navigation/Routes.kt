@@ -1,5 +1,7 @@
 package com.maryjoy.servconnect.ui.screens.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
     // Auth & Onboarding
     object Splash : Screen("splash")
@@ -20,7 +22,7 @@ sealed class Screen(val route: String) {
     object ActivityHistory : Screen("activity_history")
     object Settings : Screen("settings")
     object OpportunityDetail : Screen("opportunity_detail/{opportunityId}") {
-        fun createRoute(opportunityId: String) = "opportunity_detail/$opportunityId"
+        fun createRoute(opportunityId: String) = "opportunity_detail/${Uri.encode(opportunityId)}"
     }
 
     // Organization Path
@@ -28,29 +30,29 @@ sealed class Screen(val route: String) {
     object PostOpportunity : Screen("post_opportunity")
     object MyOpportunities : Screen("my_opportunities")
     object OrgOpportunityDetail : Screen("org_opportunity_detail/{opportunityId}") {
-        fun createRoute(opportunityId: String) = "org_opportunity_detail/$opportunityId"
+        fun createRoute(opportunityId: String) = "org_opportunity_detail/${Uri.encode(opportunityId)}"
     }
     object ManageBookings : Screen("manage_bookings/{opportunityId}") {
-        fun createRoute(opportunityId: String) = "manage_bookings/$opportunityId"
+        fun createRoute(opportunityId: String) = "manage_bookings/${Uri.encode(opportunityId)}"
     }
     object QrCode : Screen("qr_code/{opportunityId}") {
-        fun createRoute(opportunityId: String) = "qr_code/$opportunityId"
+        fun createRoute(opportunityId: String) = "qr_code/${Uri.encode(opportunityId)}"
     }
     object VolunteerProfileView : Screen("volunteer_profile_view/{volunteerId}") {
-        fun createRoute(volunteerId: String) = "volunteer_profile_view/$volunteerId"
+        fun createRoute(volunteerId: String) = "volunteer_profile_view/${Uri.encode(volunteerId)}"
     }
     object IssueCertificate : Screen("issue_certificate/{volunteerId}/{activityTitle}") {
-        fun createRoute(volunteerId: String, activityTitle: String) = "issue_certificate/$volunteerId/$activityTitle"
+        fun createRoute(volunteerId: String, activityTitle: String) = "issue_certificate/${Uri.encode(volunteerId)}/${Uri.encode(activityTitle)}"
     }
     object OrgProfile : Screen("org_profile")
 
     // Shared
     object Messages : Screen("messages")
     object ChatDetail : Screen("chat_detail/{orgId}/{orgName}") {
-        fun createRoute(orgId: String, orgName: String) = "chat_detail/$orgId/$orgName"
+        fun createRoute(orgId: String, orgName: String) = "chat_detail/${Uri.encode(orgId)}/${Uri.encode(orgName)}"
     }
     object Notifications : Screen("notifications")
     object OrgProfileView : Screen("org_profile_view/{orgId}") {
-        fun createRoute(orgId: String) = "org_profile_view/$orgId"
+        fun createRoute(orgId: String) = "org_profile_view/${Uri.encode(orgId)}"
     }
 }

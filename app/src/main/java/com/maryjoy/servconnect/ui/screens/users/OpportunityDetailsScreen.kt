@@ -477,27 +477,14 @@ private fun SkillsSection(skills: List<String>) {
         Text("Skills Needed", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Spacer(Modifier.height(12.dp))
         
-        // Workaround for Preview: FlowRow can cause NoSuchMethodError in some IDE versions
-        // due to binary incompatibility between the foundation library and LayoutLib.
-        if (androidx.compose.ui.platform.LocalInspectionMode.current) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                skills.chunked(3).forEach { rowSkills ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowSkills.forEach { skill ->
-                            Chip(text = skill)
-                        }
+        // Use a simple Column of Rows to avoid FlowRow binary compatibility issues
+        // which can cause NoSuchMethodError on some devices or versions.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            skills.chunked(3).forEach { rowSkills ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowSkills.forEach { skill ->
+                        Chip(text = skill)
                     }
-                }
-            }
-        } else {
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                skills.forEach { skill ->
-                    Chip(text = skill)
                 }
             }
         }

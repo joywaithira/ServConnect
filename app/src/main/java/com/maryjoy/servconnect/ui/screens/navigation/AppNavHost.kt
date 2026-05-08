@@ -290,7 +290,7 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0)
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 }
             )
@@ -456,7 +456,7 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0)
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 }
             )
