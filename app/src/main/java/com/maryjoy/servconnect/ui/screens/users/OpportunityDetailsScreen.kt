@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.*
@@ -28,85 +29,61 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ServerValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.delay
+
+import com.maryjoy.servconnect.ui.theme.*
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Colour tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val GreenPrimary  = Color(0xFF1A6B3C)
-private val GreenLight    = Color(0xFF2E9B5C)
-private val GreenAccent   = Color(0xFF4FCB85)
-private val GoldAccent    = Color(0xFFF4B942)
-private val SurfaceBg     = Color(0xFFF4F7F5)
-private val CardWhite     = Color(0xFFFFFFFF)
-private val TextPrimary   = Color(0xFF0D2818)
-private val TextSecondary = Color(0xFF5A7A6A)
-private val DividerColor  = Color(0xFFE0EDE6)
-private val InputBg       = Color(0xFFEEF4F0)
-private val WarningRed    = Color(0xFFE53935)
-private val WarningAmber  = Color(0xFFF4B942)
+private val GreenPrimary  = PrimaryColor
+private val GreenLight    = PrimaryColor.copy(alpha = 0.8f)
+private val GreenAccent   = SecondaryColor
+private val GoldAccent    = SecondaryColor
+private val SurfaceBg     = White
+private val CardWhite     = White
+private val TextPrimary   = DarkGray
+private val TextSecondary = Gray
+private val DividerColor  = LightGray
+private val InputBg       = LightGray.copy(alpha = 0.5f)
+private val WarningRed    = AccentColor
+private val WarningAmber  = AccentColor
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Data model
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class OpportunityDetail(
-    val id              : String,
-    val title           : String,
-    val organization    : String,
-    val orgId           : String,
-    val location        : String,
-    val fullAddress     : String,
-    val date            : String,
-    val time            : String,
-    val type            : String,
-    val groupType       : String,
-    val category        : String,
-    val emoji           : String,
-    val spotsLeft       : Int,
-    val totalSpots      : Int,
-    val hours           : Int,
-    val description     : String,
-    val skillsNeeded    : List<String>,
-    val whatToBring     : List<String>,
-    val cardGradient    : List<Color>,
-    val orgRating       : Float,
-    val isVerified      : Boolean,
+    val id              : String = "",
+    val title           : String = "",
+    val organization    : String = "",
+    val orgId           : String = "",
+    val location        : String = "",
+    val fullAddress     : String = "",
+    val date            : String = "",
+    val time            : String = "",
+    val type            : String = "",
+    val groupType       : String = "",
+    val category        : String = "",
+    val emoji           : String = "",
+    val spotsLeft       : Int = 0,
+    val totalSpots      : Int = 0,
+    val hours           : Int = 0,
+    val description     : String = "",
+    val skillsNeeded    : List<String> = emptyList(),
+    val whatToBring     : List<String> = emptyList(),
+    val cardGradient    : List<Color> = listOf(Color(0xFF1A6B3C), Color(0xFF2E9B5C)),
+    val orgRating       : Float = 0.0f,
+    val isVerified      : Boolean = false,
     val isBookmarked    : Boolean = false,
-    val status          : String = "Open"   // Open | Full | Completed
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Sample data (replace with Firebase fetch by id)
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun getSampleDetail(id: String) = OpportunityDetail(
-    id           = id,
-    title        = "Teach Reading to Kids",
-    organization = "Brighter Futures Kenya",
-    orgId        = "org_1",
-    location     = "Westlands, Nairobi",
-    fullAddress  = "Brighter Futures Centre, Ring Road Westlands, Nairobi",
-    date         = "Saturday, 17 May 2025",
-    time         = "9:00 AM – 12:00 PM",
-    type         = "Volunteer",
-    groupType    = "Individual",
-    category     = "Children",
-    emoji        = "🧒",
-    spotsLeft    = 4,
-    totalSpots   = 10,
-    hours        = 3,
-    description  = "Join us for a rewarding morning helping children at Brighter Futures Centre improve their reading and comprehension skills. Volunteers will work one-on-one or in small groups with children aged 6–12. No prior teaching experience is required — just patience, enthusiasm, and a love for helping young minds grow.\n\nThis is a great opportunity to give back to your community while building meaningful relationships with the children.",
-    skillsNeeded = listOf("Patience", "Communication", "English literacy", "Child care"),
-    whatToBring  = listOf("National ID / Student ID", "Comfortable clothes", "Water bottle", "Positive energy 😊"),
-    cardGradient = listOf(Color(0xFF1A6B3C), Color(0xFF2E9B5C)),
-    orgRating    = 4.7f,
-    isVerified   = true,
-    status       = "Open"
+    val status          : String = "Open",
+    val imageUrl        : String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,10 +98,66 @@ fun OpportunityDetailScreen(
     onViewOrgProfile: (String) -> Unit,
     onMessageClick  : (String, String) -> Unit
 ) {
-    // In production: val detail by viewModel.getDetail(opportunityId).collectAsState()
-    val detail            = getSampleDetail(opportunityId)
+    val database = remember { FirebaseDatabase.getInstance() }
+    var detail by remember { mutableStateOf<OpportunityDetail?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(opportunityId) {
+        database.getReference("opportunities").child(opportunityId).get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val skills = snapshot.child("skillsNeeded").children.mapNotNull { it.getValue(String::class.java) }
+                    val items = snapshot.child("whatToBring").children.mapNotNull { it.getValue(String::class.java) }
+                    
+                    detail = OpportunityDetail(
+                        id = snapshot.child("id").value?.toString() ?: "",
+                        title = snapshot.child("title").value?.toString() ?: "",
+                        organization = snapshot.child("organization").value?.toString() ?: "",
+                        orgId = snapshot.child("orgId").value?.toString() ?: "",
+                        location = snapshot.child("location").value?.toString() ?: "",
+                        fullAddress = snapshot.child("fullAddress").value?.toString() ?: "",
+                        date = snapshot.child("date").value?.toString() ?: "",
+                        time = snapshot.child("time").value?.toString() ?: "",
+                        type = snapshot.child("type").value?.toString() ?: "",
+                        groupType = snapshot.child("groupType").value?.toString() ?: "",
+                        category = snapshot.child("category").value?.toString() ?: "",
+                        emoji = snapshot.child("emoji").value?.toString() ?: "👋",
+                        spotsLeft = (snapshot.child("spotsLeft").value as? Long)?.toInt() ?: 0,
+                        totalSpots = (snapshot.child("totalSpots").value as? Long)?.toInt() ?: 0,
+                        hours = (snapshot.child("hours").value as? Long)?.toInt() ?: 0,
+                        description = snapshot.child("description").value?.toString() ?: "",
+                        skillsNeeded = if (skills.isEmpty()) listOf("General Help") else skills,
+                        whatToBring = if (items.isEmpty()) listOf("Enthusiasm") else items,
+                        orgRating = (snapshot.child("orgRating").value as? Double)?.toFloat() ?: 0.0f,
+                        isVerified = snapshot.child("isVerified").value as? Boolean ?: false,
+                        status = snapshot.child("status").value?.toString() ?: "Open",
+                        imageUrl = snapshot.child("imageUrl").value?.toString()
+                    )
+                }
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
+            }
+    }
+
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = GreenPrimary)
+        }
+        return
+    }
+
+    if (detail == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Opportunity not found")
+        }
+        return
+    }
+
+    val currentDetail = detail!!
     val scrollState       = rememberScrollState()
-    var isBookmarked      by remember { mutableStateOf(detail.isBookmarked) }
+    var isBookmarked      by remember { mutableStateOf(currentDetail.isBookmarked) }
     var showBooking       by remember { mutableStateOf(false) }
     var showInvite        by remember { mutableStateOf(false) }
     var showShareSnackbar by remember { mutableStateOf(false) }
@@ -144,43 +177,43 @@ fun OpportunityDetailScreen(
         ) {
             // Hero banner
             DetailHeroBanner(
-                detail       = detail,
+                detail       = currentDetail,
                 isBookmarked = isBookmarked,
                 onBookmark   = { isBookmarked = !isBookmarked },
                 onBack       = onNavigateBack
             )
 
             // Status + spots bar
-            StatusSpotsSection(detail = detail)
+            StatusSpotsSection(detail = currentDetail)
 
             // Key info grid
-            KeyInfoGrid(detail = detail)
+            KeyInfoGrid(detail = currentDetail)
 
             HorizontalDivider(color = DividerColor, thickness = 1.dp,
                 modifier = Modifier.padding(horizontal = 20.dp))
 
             // Description
-            DescriptionSection(description = detail.description)
+            DescriptionSection(description = currentDetail.description)
 
             HorizontalDivider(color = DividerColor, thickness = 1.dp,
                 modifier = Modifier.padding(horizontal = 20.dp))
 
             // Skills needed
-            SkillsSection(skills = detail.skillsNeeded)
+            SkillsSection(skills = currentDetail.skillsNeeded)
 
             HorizontalDivider(color = DividerColor, thickness = 1.dp,
                 modifier = Modifier.padding(horizontal = 20.dp))
 
             // What to bring
-            WhatToBringSection(items = detail.whatToBring)
+            WhatToBringSection(items = currentDetail.whatToBring)
 
             HorizontalDivider(color = DividerColor, thickness = 1.dp,
                 modifier = Modifier.padding(horizontal = 20.dp))
 
             // Organisation card
             OrganisationCard(
-                detail      = detail,
-                onViewOrg   = { onViewOrgProfile(detail.orgId) }
+                detail      = currentDetail,
+                onViewOrg   = { onViewOrgProfile(currentDetail.orgId) }
             )
 
             // QR Check-in info nudge
@@ -190,7 +223,7 @@ fun OpportunityDetailScreen(
             InviteShareRow(
                 onInvite = { showInvite = true },
                 onShare  = {
-                    clipboardManager.setText(AnnotatedString("servconnect://opportunity/${detail.id}"))
+                    clipboardManager.setText(AnnotatedString("servconnect://opportunity/${currentDetail.id}"))
                     showShareSnackbar = true
                 }
             )
@@ -206,7 +239,7 @@ fun OpportunityDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             CollapsedTopBar(
-                title       = detail.title,
+                title       = currentDetail.title,
                 onBack      = onNavigateBack,
                 isBookmarked = isBookmarked,
                 onBookmark  = { isBookmarked = !isBookmarked }
@@ -236,16 +269,16 @@ fun OpportunityDetailScreen(
 
         // ── Fixed bottom CTA ──
         BottomCta(
-            detail   = detail,
+            detail   = currentDetail,
             modifier = Modifier.align(Alignment.BottomCenter),
             onBook   = { showBooking = true },
-            onMessage = { onMessageClick(detail.orgId, detail.organization) }
+            onMessage = { onMessageClick(currentDetail.orgId, currentDetail.organization) }
         )
 
         // ── Booking sheet ──
         if (showBooking) {
             BookingBottomSheet(
-                detail    = detail,
+                detail    = currentDetail,
                 onConfirm = {
                     showBooking = false
                     onBookingSuccess()
@@ -257,10 +290,10 @@ fun OpportunityDetailScreen(
         // ── Invite friends sheet ──
         if (showInvite) {
             InviteFriendsSheet(
-                opportunityTitle = detail.title,
+                opportunityTitle = currentDetail.title,
                 onDismiss        = { showInvite = false },
                 onCopyLink       = {
-                    clipboardManager.setText(AnnotatedString("servconnect://opportunity/${detail.id}"))
+                    clipboardManager.setText(AnnotatedString("servconnect://opportunity/${currentDetail.id}"))
                     showInvite = false
                     showShareSnackbar = true
                 }
@@ -307,6 +340,17 @@ private fun DetailHeroBanner(
             .height(280.dp)
             .background(Brush.linearGradient(detail.cardGradient))
     ) {
+        if (detail.imageUrl != null) {
+            AsyncImage(
+                model = detail.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            // Overlay to make text readable
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
+        }
+
         // Background gradient and content
         Column(
             modifier = Modifier
@@ -654,12 +698,26 @@ private fun BookingBottomSheet(
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val database = FirebaseDatabase.getInstance()
+    val firestore = FirebaseFirestore.getInstance()
 
     var selectedDate  by remember { mutableStateOf(detail.date) }
     var selectedSlot  by remember { mutableStateOf("9:00 AM") }
     var isGroupBooking by remember { mutableStateOf(false) }
     var groupSize      by remember { mutableStateOf(1) }
     val timeSlots      = listOf("9:00 AM", "10:00 AM", "11:00 AM")
+
+    var volunteerName by remember { mutableStateOf("") }
+    var volunteerImageUrl by remember { mutableStateOf("") }
+
+    LaunchedEffect(auth.currentUser?.uid) {
+        val uid = auth.currentUser?.uid
+        if (uid != null) {
+            database.getReference("volunteers").child(uid).get().addOnSuccessListener { snapshot ->
+                volunteerName = snapshot.child("fullName").value?.toString() ?: ""
+                volunteerImageUrl = snapshot.child("profileImageUrl").value?.toString() ?: ""
+            }
+        }
+    }
 
     // Scrim
     Box(
@@ -867,35 +925,35 @@ private fun BookingBottomSheet(
                     onClick  = {
                         val currentUser = auth.currentUser
                         if (currentUser != null) {
-                            val bookingId = database.getReference("bookings").push().key
-                            if (bookingId != null) {
-                                val bookingData = hashMapOf(
-                                    "opportunityId" to detail.id,
-                                    "opportunityTitle" to detail.title,
-                                    "organizationId" to detail.orgId,
-                                    "organizationName" to detail.organization,
-                                    "volunteerId" to currentUser.uid,
-                                    "volunteerEmail" to currentUser.email,
-                                    "bookingDate" to selectedDate,
-                                    "bookingTimeSlot" to selectedSlot,
-                                    "isGroupBooking" to isGroupBooking,
-                                    "groupSize" to if (isGroupBooking) groupSize else 1,
-                                    "timestamp" to ServerValue.TIMESTAMP
-                                )
+                            val bookingData = hashMapOf(
+                                "opportunityId" to detail.id,
+                                "opportunityTitle" to detail.title,
+                                "orgId" to detail.orgId,
+                                "orgName" to detail.organization,
+                                "location" to detail.location,
+                                "date" to selectedDate,
+                                "startTime" to selectedSlot,
+                                "endTime" to (detail.time.split(" – ").lastOrNull() ?: ""),
+                                "volunteerId" to currentUser.uid,
+                                "volunteerName" to volunteerName,
+                                "volunteerImageUrl" to volunteerImageUrl,
+                                "volunteerEmail" to (currentUser.email ?: ""),
+                                "status" to "confirmed",
+                                "type" to "volunteer",
+                                "isGroupBooking" to isGroupBooking,
+                                "groupSize" to if (isGroupBooking) groupSize else 1,
+                                "bookedAt" to System.currentTimeMillis()
+                            )
 
-                                database.getReference("bookings").child(bookingId).setValue(bookingData)
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            Toast.makeText(context, "Booking confirmed!", Toast.LENGTH_SHORT).show()
-                                            onConfirm()
-                                        } else {
-                                            Toast.makeText(context, "Failed to confirm booking: ${task.exception?.message}", Toast.LENGTH_LONG).show()
-                                            Log.e("BookingBottomSheet", "Failed to confirm booking", task.exception)
-                                        }
-                                    }
-                            } else {
-                                Toast.makeText(context, "Failed to generate booking ID.", Toast.LENGTH_SHORT).show()
-                            }
+                            firestore.collection("bookings").add(bookingData)
+                                .addOnSuccessListener {
+                                    Toast.makeText(context, "Booking confirmed!", Toast.LENGTH_SHORT).show()
+                                    onConfirm()
+                                }
+                                .addOnFailureListener { e ->
+                                    Toast.makeText(context, "Failed to confirm booking: ${e.message}", Toast.LENGTH_LONG).show()
+                                    Log.e("BookingBottomSheet", "Failed to confirm booking", e)
+                                }
                         } else {
                             Toast.makeText(context, "You need to be logged in to book a spot.", Toast.LENGTH_LONG).show()
                         }

@@ -23,9 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.maryjoy.servconnect.ui.theme.AccentColor
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.*
 
 // --- DATA MODELS ---
 data class Conversation(
@@ -60,16 +58,16 @@ fun MessagesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Messages", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Messages", fontWeight = FontWeight.Bold, color = White) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = OffWhite
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -99,12 +97,12 @@ private fun SearchBarSection() {
             value = "",
             onValueChange = {},
             placeholder = { Text("Search messages...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Gray) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PrimaryColor,
-                unfocusedBorderColor = Color.LightGray
+                unfocusedBorderColor = Gray
             )
         )
     }
@@ -145,7 +143,7 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                 Text(
                     text = conversation.time,
                     fontSize = 12.sp,
-                    color = if (conversation.unreadCount > 0) PrimaryColor else Color.Gray
+                    color = if (conversation.unreadCount > 0) PrimaryColor else Gray
                 )
             }
 
@@ -159,7 +157,7 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                 Text(
                     text = conversation.lastMessage,
                     fontSize = 14.sp,
-                    color = if (conversation.unreadCount > 0) Color.Black else Color.Gray,
+                    color = if (conversation.unreadCount > 0) DarkGray else Gray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -175,7 +173,7 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                     ) {
                         Text(
                             text = conversation.unreadCount.toString(),
-                            color = Color.White,
+                            color = White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -211,12 +209,12 @@ fun ChatDetailScreen(
                             modifier = Modifier.size(32.dp).clip(CircleShape)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(organizationName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp)
+                        Text(organizationName, fontWeight = FontWeight.Bold, color = White, fontSize = 18.sp)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
@@ -227,7 +225,7 @@ fun ChatDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFF0F2F5))
+                .background(OffWhite)
         ) {
             LazyColumn(
                 modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
@@ -258,20 +256,20 @@ fun ChatBubble(message: ChatMessage) {
                 bottomStart = if (message.isFromMe) 16.dp else 0.dp,
                 bottomEnd = if (message.isFromMe) 0.dp else 16.dp
             ),
-            color = if (message.isFromMe) PrimaryColor else Color.White,
+            color = if (message.isFromMe) PrimaryColor else White,
             tonalElevation = 1.dp
         ) {
             Text(
                 text = message.text,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                color = if (message.isFromMe) Color.White else Color.Black,
+                color = if (message.isFromMe) White else DarkGray,
                 fontSize = 14.sp
             )
         }
         Text(
             text = message.time,
             fontSize = 10.sp,
-            color = Color.Gray,
+            color = Gray,
             modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp)
         )
     }
@@ -282,7 +280,7 @@ fun ChatInputSection() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 8.dp,
-        color = Color.White
+        color = White
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -301,8 +299,8 @@ fun ChatInputSection() {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color(0xFFF0F2F5),
-                    unfocusedContainerColor = Color(0xFFF0F2F5)
+                    focusedContainerColor = OffWhite,
+                    unfocusedContainerColor = OffWhite
                 )
             )
 
@@ -312,7 +310,7 @@ fun ChatInputSection() {
                 onClick = {},
                 modifier = Modifier.size(40.dp),
                 containerColor = PrimaryColor,
-                contentColor = Color.White,
+                contentColor = White,
                 shape = CircleShape,
                 elevation = FloatingActionButtonDefaults.elevation(0.dp)
             ) {

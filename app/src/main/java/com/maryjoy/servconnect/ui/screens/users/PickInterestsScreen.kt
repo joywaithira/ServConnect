@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
+import com.maryjoy.servconnect.ui.theme.*
 
 // ─── Data model ────────────────────────────────────────────────────────────────
 
@@ -34,15 +35,15 @@ data class InterestCategory(
 
 // ─── Color palette (add to your Color.kt or keep here) ─────────────────────────
 
-private val GreenPrimary   = Color(0xFF1A6B3C)
-private val GreenLight     = Color(0xFF2E9B5C)
-private val GreenAccent    = Color(0xFF4FCB85)
-private val GoldAccent     = Color(0xFFF4B942)
-private val SurfaceWhite   = Color(0xFFF8FAF9)
-private val CardSurface    = Color(0xFFFFFFFF)
-private val TextPrimary    = Color(0xFF0D2818)
-private val TextSecondary  = Color(0xFF5A7A6A)
-private val UnselectedBg   = Color(0xFFEEF4F0)
+private val GreenPrimary   = PrimaryColor
+private val GreenLight     = PrimaryColor.copy(alpha = 0.8f)
+private val GreenAccent    = SecondaryColor
+private val GoldAccent     = AccentColor
+private val SurfaceWhite   = White
+private val CardSurface    = White
+private val TextPrimary    = DarkGray
+private val TextSecondary  = Gray
+private val UnselectedBg   = LightGray
 
 // ─── Interest data ──────────────────────────────────────────────────────────────
 

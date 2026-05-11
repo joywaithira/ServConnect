@@ -24,19 +24,28 @@ import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 
+import com.maryjoy.servconnect.ui.theme.PrimaryColor
+import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.AccentColor
+import com.maryjoy.servconnect.ui.theme.White
+import com.maryjoy.servconnect.ui.theme.OffWhite
+import com.maryjoy.servconnect.ui.theme.DarkGray
+import com.maryjoy.servconnect.ui.theme.Gray
+import com.maryjoy.servconnect.ui.theme.LightGray
+
 // ─────────────────────────────────────────────
 //  COLORS
 // ─────────────────────────────────────────────
-private val PrimaryGreen    = Color(0xFF676B2C)
-private val SecondaryGold   = Color(0xFFF3DF90)
-private val AccentOrange    = Color(0xFFFF5722)
-private val SurfaceWhite    = Color(0xFFFFFFFF)
-private val SurfaceOffWhite = Color(0xFFFAF9F4)
-private val TextPrimary     = Color(0xFF1A1C0A)
-private val TextSecondary   = Color(0xFF5A5D30)
-private val TextHint        = Color(0xFF9E9E9E)
-private val DividerColor    = Color(0xFFEEECE0)
-private val StatusOpen      = Color(0xFF4CAF50)
+private val PrimaryGreen    = PrimaryColor
+private val SecondaryGold   = SecondaryColor
+private val AccentOrange    = AccentColor
+private val SurfaceWhite    = White
+private val SurfaceOffWhite = OffWhite
+private val TextPrimary     = DarkGray
+private val TextSecondary   = PrimaryColor
+private val TextHint        = Gray
+private val DividerColor    = LightGray
+private val StatusOpen      = PrimaryColor
 
 // ─────────────────────────────────────────────
 //  DATA MODELS

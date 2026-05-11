@@ -20,6 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import com.maryjoy.servconnect.ui.theme.PrimaryColor
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 
 // --- DATA MODELS ---
 data class OrgOpportunity(
@@ -38,11 +43,45 @@ fun MyOpportunitiesScreen(
     onNavigateBack: () -> Unit,
     onOpportunityClick: (String) -> Unit
 ) {
-    val opportunities = listOf(
-        OrgOpportunity("1", "Weekend Tutoring", "May 12, 2024", 8, 10, "Open"),
-        OrgOpportunity("2", "Beach Cleanup", "May 15, 2024", 20, 20, "Full"),
-        OrgOpportunity("3", "Food Drive", "April 20, 2024", 15, 15, "Completed")
-    )
+    val auth = remember { FirebaseAuth.getInstance() }
+    val database = remember { FirebaseDatabase.getInstance() }
+    val userId = auth.currentUser?.uid
+
+    var opportunities by remember { mutableStateOf<List<OrgOpportunity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            val query = database.getReference("opportunities")
+                .orderByChild("orgId").equalTo(userId)
+
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val list = mutableListOf<OrgOpportunity>()
+                    for (child in snapshot.children) {
+                        val id = child.child("id").value?.toString() ?: ""
+                        val title = child.child("title").value?.toString() ?: ""
+                        val date = child.child("date").value?.toString() ?: ""
+                        val totalSlots = (child.child("totalSlots").value as? Long)?.toInt() ?: 0
+                        val spotsLeft = (child.child("spotsLeft").value as? Long)?.toInt() ?: 0
+                        val slotsFilled = totalSlots - spotsLeft
+                        val status = child.child("status").value?.toString() ?: "Open"
+                        
+                        list.add(OrgOpportunity(id, title, date, slotsFilled, totalSlots, status))
+                    }
+                    opportunities = list
+                    isLoading = false
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    isLoading = false
+                }
+            }
+            query.addValueEventListener(listener)
+        } else {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -58,16 +97,26 @@ fun MyOpportunitiesScreen(
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(opportunities) { opportunity ->
-                OrgOpportunityCard(opportunity, onClick = { onOpportunityClick(opportunity.id) })
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
+            }
+        } else if (opportunities.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No opportunities posted yet.", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(opportunities) { opportunity ->
+                    OrgOpportunityCard(opportunity, onClick = { onOpportunityClick(opportunity.id) })
+                }
             }
         }
     }

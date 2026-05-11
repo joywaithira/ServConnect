@@ -2,8 +2,7 @@ package com.maryjoy.servconnect.ui.screens.shared.splash
 
 import com.maryjoy.servconnect.R
 import androidx.compose.ui.tooling.preview.Preview
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -86,7 +85,7 @@ fun SplashScreen(
             )
         }
 
-        // Version or Loading indicator at the bottom
+            // Version or Loading indicator at the bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()

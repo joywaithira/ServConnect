@@ -21,9 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
-import com.maryjoy.servconnect.ui.theme.AccentColor
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.*
 
 // --- DATA MODELS ---
 data class OrgStats(
@@ -62,13 +60,13 @@ fun OrgDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ServConnect", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("ServConnect", fontWeight = FontWeight.Bold, color = White) },
                 actions = {
                     IconButton(onClick = onNavigateToNotifications) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = White)
                     }
                     IconButton(onClick = onNavigateToProfile) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = Color.White)
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
@@ -79,13 +77,13 @@ fun OrgDashboardScreen(
                 ExtendedFloatingActionButton(
                     onClick = onNavigateToPostOpportunity,
                     containerColor = AccentColor,
-                    contentColor = Color.White,
+                    contentColor = White,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
                     text = { Text("Post Opportunity") }
                 )
             }
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = OffWhite
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -108,7 +106,7 @@ fun OrgDashboardScreen(
                     text = "Recent Activity",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1D1D1D),
+                    color = DarkGray,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
             }
@@ -128,8 +126,8 @@ fun OrgDashboardScreen(
 
 @Composable
 fun VerificationBanner(isVerified: Boolean) {
-    val bgColor = if (isVerified) PrimaryColor.copy(alpha = 0.1f) else Color.Red.copy(alpha = 0.1f)
-    val textColor = if (isVerified) PrimaryColor else Color.Red
+    val bgColor = if (isVerified) PrimaryColor.copy(alpha = 0.1f) else AccentColor.copy(alpha = 0.1f)
+    val textColor = if (isVerified) PrimaryColor else AccentColor
     val icon = if (isVerified) Icons.Default.Verified else Icons.Default.Pending
     val text = if (isVerified) "Verified Organization" else "Pending Verification"
 
@@ -187,7 +185,7 @@ fun StatCard(
     Card(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -196,8 +194,8 @@ fun StatCard(
         ) {
             Icon(icon, contentDescription = null, tint = PrimaryColor, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
-            Text(label, fontSize = 12.sp, color = Color.Gray)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkGray)
+            Text(label, fontSize = 12.sp, color = Gray)
         }
     }
 }
@@ -248,7 +246,7 @@ fun ActivityItem(activity: RecentActivity) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = White)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -276,9 +274,9 @@ fun ActivityItem(activity: RecentActivity) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
-                Text(activity.activityTitle, fontSize = 12.sp, color = Color.Gray)
+                Text(activity.activityTitle, fontSize = 12.sp, color = Gray)
             }
-            Text(activity.time, fontSize = 11.sp, color = Color.Gray)
+            Text(activity.time, fontSize = 11.sp, color = Gray)
         }
     }
 }

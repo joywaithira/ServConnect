@@ -27,7 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-
+import com.google.firebase.database.FirebaseDatabase
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Colour tokens
@@ -61,54 +61,21 @@ data class FilterState(
 // Reuse OpportunityItem from HomeScreen (or move to a shared models file)
 // For this file we re-declare a local alias so the file compiles standalone:
 private data class ExploreOpportunity(
-    val id           : String,
-    val title        : String,
-    val organization : String,
-    val location     : String,
-    val date         : String,
-    val type         : String,
-    val groupType    : String,   // "Individual" | "Group" | "Both"
-    val category     : String,
-    val emoji        : String,
-    val spotsLeft    : Int,
-    val totalSpots   : Int,
-    val hours        : Int,
-    val cardGradient : List<Color>,
-    val orgRating    : Float = 4.5f,
-    val isVerified   : Boolean = true
-)
-
-private val allOpportunities = listOf(
-    ExploreOpportunity("1","Teach Reading to Kids","Brighter Futures Kenya",
-        "Westlands, Nairobi","Sat, 17 May","Volunteer","Individual","Children","🧒",
-        4,10,3, listOf(Color(0xFF1A6B3C), Color(0xFF2E9B5C))),
-    ExploreOpportunity("2","Elderly Home Weekend Visit","Golden Years NGO",
-        "Karen, Nairobi","Sun, 18 May","Community Service","Both","Elderly","👴",
-        8,15,4, listOf(Color(0xFF4A148C), Color(0xFF7B1FA2))),
-    ExploreOpportunity("3","Beach Clean-Up Drive","Clean Earth Initiative",
-        "Mombasa Road","Sat, 24 May","Volunteer","Group","Environment","🌿",
-        12,30,5, listOf(Color(0xFF00695C), Color(0xFF00897B))),
-    ExploreOpportunity("4","Food Drive at Kibera","Feed the City",
-        "Kibera, Nairobi","Fri, 23 May","Community Service","Both","Hunger","🍽️",
-        2,20,6, listOf(Color(0xFFE65100), Color(0xFFEF6C00))),
-    ExploreOpportunity("5","Animal Shelter Care Day","Paws & Hearts",
-        "Kilimani, Nairobi","Sat, 31 May","Volunteer","Individual","Animals","🐾",
-        6,10,3, listOf(Color(0xFF1565C0), Color(0xFF1976D2))),
-    ExploreOpportunity("6","Special Needs School Visit","Ability Kenya",
-        "Parklands, Nairobi","Thu, 22 May","Community Service","Group","Special Needs","♿",
-        5,12,4, listOf(Color(0xFF880E4F), Color(0xFFC2185B))),
-    ExploreOpportunity("7","Women Empowerment Workshop","She Leads Africa",
-        "CBD, Nairobi","Sat, 7 Jun","Volunteer","Both","Women","👩",
-        9,20,3, listOf(Color(0xFF4A148C), Color(0xFF6A1B9A))),
-    ExploreOpportunity("8","Youth Mentorship Saturday","Future Leaders KE",
-        "Kasarani, Nairobi","Sat, 14 Jun","Volunteer","Individual","Youth","✊",
-        3,8,2, listOf(Color(0xFF1A237E), Color(0xFF283593))),
-    ExploreOpportunity("9","Community Garden Project","Green Spaces NGO",
-        "Ruaka, Nairobi","Sun, 15 Jun","Community Service","Group","Environment","🌱",
-        15,25,6, listOf(Color(0xFF1B5E20), Color(0xFF2E7D32))),
-    ExploreOpportunity("10","Hospital Patient Companionship","Healing Hearts",
-        "Aga Khan Hospital","Sat, 21 Jun","Community Service","Individual","Health","❤️",
-        4,10,4, listOf(Color(0xFFB71C1C), Color(0xFFC62828)))
+    val id           : String = "",
+    val title           : String = "",
+    val organization : String = "",
+    val location     : String = "",
+    val date         : String = "",
+    val type         : String = "",
+    val groupType    : String = "",   // "Individual" | "Group" | "Both"
+    val category     : String = "",
+    val emoji        : String = "",
+    val spotsLeft    : Int = 0,
+    val totalSpots   : Int = 0,
+    val hours        : Int = 0,
+    val cardGradient : List<Color> = listOf(Color(0xFF1A6B3C), Color(0xFF2E9B5C)),
+    val orgRating    : Float = 0.0f,
+    val isVerified   : Boolean = false
 )
 
 private val typeOptions      = listOf("All", "Volunteer", "Community Service")
@@ -130,6 +97,37 @@ fun ExploreScreen(
     onNavigateBack: () -> Unit,
     onOpportunityClick: (String) -> Unit
 ) {
+    val database = remember { FirebaseDatabase.getInstance() }
+    var allOpportunities by remember { mutableStateOf<List<ExploreOpportunity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        database.getReference("opportunities").get().addOnSuccessListener { snapshot ->
+            val list = mutableListOf<ExploreOpportunity>()
+            for (child in snapshot.children) {
+                list.add(ExploreOpportunity(
+                    id = child.child("id").value?.toString() ?: "",
+                    title = child.child("title").value?.toString() ?: "",
+                    organization = child.child("organization").value?.toString() ?: "",
+                    location = child.child("location").value?.toString() ?: "",
+                    date = child.child("date").value?.toString() ?: "",
+                    type = child.child("type").value?.toString() ?: "Volunteer",
+                    groupType = child.child("groupType").value?.toString() ?: "Individual",
+                    category = child.child("category").value?.toString() ?: "General",
+                    emoji = child.child("emoji").value?.toString() ?: "👋",
+                    spotsLeft = (child.child("spotsLeft").value as? Long)?.toInt() ?: 0,
+                    totalSpots = (child.child("totalSpots").value as? Long)?.toInt() ?: 0,
+                    hours = (child.child("hours").value as? Long)?.toInt() ?: 0,
+                    orgRating = (child.child("orgRating").value as? Double)?.toFloat() ?: 0.0f,
+                    isVerified = child.child("isVerified").value as? Boolean ?: false
+                ))
+            }
+            allOpportunities = list
+            isLoading = false
+        }.addOnFailureListener {
+            isLoading = false
+        }
+    }
 
     var searchQuery     by remember { mutableStateOf("") }
     var filterState     by remember { mutableStateOf(FilterState()) }
@@ -199,6 +197,14 @@ fun ExploreScreen(
                 // ── Top bar ──
                 item {
                     ExploreTopBar(onBack = onNavigateBack)
+                }
+
+                if (isLoading) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = GreenPrimary)
+                        }
+                    }
                 }
 
                 // ── Search bar ──

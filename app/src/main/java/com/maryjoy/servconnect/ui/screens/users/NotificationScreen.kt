@@ -21,9 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
-import com.maryjoy.servconnect.ui.theme.AccentColor
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.*
 
 
 // --- DATA MODELS ---
@@ -76,21 +74,21 @@ fun NotificationsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Notifications", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Notifications", fontWeight = FontWeight.Bold, color = White) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = White)
                     }
                 },
                 actions = {
                     TextButton(onClick = { /* Mark all as read */ }) {
-                        Text("Mark all as read", color = Color.White, fontSize = 12.sp)
+                        Text("Mark all as read", color = White, fontSize = 12.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = OffWhite
     ) { paddingValues ->
         if (notifications.isEmpty()) {
             EmptyNotificationsView()
@@ -127,7 +125,7 @@ fun NotificationRow(notification: NotificationItem) {
         }
         NotificationType.EVENT_FULL -> {
             icon = Icons.Default.Error
-            iconColor = Color.Red
+            iconColor = AccentColor
         }
         NotificationType.CERTIFICATE_READY -> {
             icon = Icons.Default.WorkspacePremium
@@ -135,7 +133,7 @@ fun NotificationRow(notification: NotificationItem) {
         }
         NotificationType.SYSTEM -> {
             icon = Icons.Default.Info
-            iconColor = Color.Gray
+            iconColor = Gray
         }
     }
 
@@ -169,7 +167,7 @@ fun NotificationRow(notification: NotificationItem) {
                     text = notification.title,
                     fontSize = 15.sp,
                     fontWeight = if (notification.isRead) FontWeight.Medium else FontWeight.Bold,
-                    color = Color(0xFF1D1D1D)
+                    color = DarkGray
                 )
                 if (!notification.isRead) {
                     Box(modifier = Modifier.size(8.dp).background(AccentColor, CircleShape))
@@ -181,7 +179,7 @@ fun NotificationRow(notification: NotificationItem) {
             Text(
                 text = notification.message,
                 fontSize = 13.sp,
-                color = if (notification.isRead) Color.Gray else Color.DarkGray,
+                color = if (notification.isRead) Gray else DarkGray,
                 lineHeight = 18.sp
             )
 
@@ -190,7 +188,7 @@ fun NotificationRow(notification: NotificationItem) {
             Text(
                 text = notification.time,
                 fontSize = 11.sp,
-                color = Color.Gray
+                color = Gray
             )
         }
     }
@@ -207,11 +205,11 @@ fun EmptyNotificationsView() {
             imageVector = Icons.Default.NotificationsNone,
             contentDescription = null,
             modifier = Modifier.size(80.dp),
-            tint = Color.LightGray
+            tint = Gray
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Text("No notifications yet", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-        Text("We'll notify you when something important happens", fontSize = 14.sp, color = Color.LightGray)
+        Text("No notifications yet", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gray)
+        Text("We'll notify you when something important happens", fontSize = 14.sp, color = Gray)
     }
 }
 

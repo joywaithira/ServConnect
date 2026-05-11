@@ -1,10 +1,5 @@
 package com.maryjoy.servconnect.ui.screens.organization
 
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.compose.rememberNavController
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,18 +15,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
+import com.maryjoy.servconnect.ui.theme.PrimaryColor
+import com.maryjoy.servconnect.ui.theme.SecondaryColor
 
 
 // --- DATA MODELS ---
 data class Booking(
-    val id: String,
-    val volunteerName: String,
-    val volunteerImageUrl: String,
-    val status: String, // "Pending", "Confirmed", "Checked-in"
-    val time: String
+    val id: String = "",
+    val volunteerId: String = "",
+    val volunteerName: String = "",
+    val volunteerImageUrl: String = "",
+    val status: String = "", // "Pending", "Confirmed", "Checked-in"
+    val time: String = ""
 )
 
 // --- MAIN SCREEN ---
@@ -42,11 +43,39 @@ fun ManageBookingsScreen(
     onNavigateBack: () -> Unit,
     onVolunteerClick: (String) -> Unit
 ) {
-    val bookings = listOf(
-        Booking("1", "Jane Doe", "https://i.pravatar.cc/150?img=32", "Confirmed", "10:30 AM"),
-        Booking("2", "John Smith", "https://i.pravatar.cc/150?img=12", "Pending", "11:00 AM"),
-        Booking("3", "Alice W.", "https://i.pravatar.cc/150?img=45", "Checked-in", "09:15 AM")
-    )
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val database = remember { FirebaseDatabase.getInstance() }
+    var bookings by remember { mutableStateOf<List<Booking>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(opportunityId) {
+        val query = if (opportunityId == "all") {
+            firestore.collection("bookings")
+        } else {
+            firestore.collection("bookings").whereEqualTo("opportunityId", opportunityId)
+        }
+
+        query.get().addOnSuccessListener { snapshot ->
+            val list = snapshot.documents.map { doc ->
+                val vId = doc.getString("volunteerId") ?: ""
+                val status = doc.getString("status") ?: "Pending"
+                val time = doc.getString("startTime") ?: "N/A"
+                
+                Booking(
+                    id = doc.id,
+                    volunteerId = vId,
+                    volunteerName = doc.getString("volunteerName") ?: "Volunteer",
+                    volunteerImageUrl = doc.getString("volunteerImageUrl") ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+                    status = status.replaceFirstChar { it.uppercase() },
+                    time = time
+                )
+            }
+            bookings = list
+            isLoading = false
+        }.addOnFailureListener {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -62,24 +91,34 @@ fun ManageBookingsScreen(
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            item {
-                Text(
-                    "Current Bookings",
-                    modifier = Modifier.padding(16.dp),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1D1D1D)
-                )
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                item {
+                    Text(
+                        if (bookings.isEmpty()) "No Bookings Found" else "Current Bookings",
+                        modifier = Modifier.padding(16.dp),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1D1D1D)
+                    )
+                }
 
-            items(bookings) { booking ->
-                BookingItem(booking, onClick = { onVolunteerClick(booking.id) })
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = Color.LightGray)
+                items(bookings) { booking ->
+                    BookingItem(booking, onClick = { onVolunteerClick(booking.volunteerId) })
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = Color.LightGray
+                    )
+                }
             }
         }
     }

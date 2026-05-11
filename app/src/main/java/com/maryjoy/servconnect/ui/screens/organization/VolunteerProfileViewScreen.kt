@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.google.firebase.database.FirebaseDatabase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,8 +34,28 @@ fun VolunteerProfileViewScreen(
     onIssueCertificateClick: (String, String) -> Unit,
     onMessageClick: (String) -> Unit
 ) {
-    val volunteerName = "Jane Doe" // Mocking for now
-    val activityTitle = "Weekend Tutoring" // Mocking for now
+    val database = remember { FirebaseDatabase.getInstance() }
+    var volunteerName by remember { mutableStateOf("Loading...") }
+    var interests by remember { mutableStateOf("") }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(volunteerId) {
+        database.getReference("volunteers").child(volunteerId).get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    volunteerName = snapshot.child("fullName").value?.toString() ?: "Volunteer"
+                    interests = snapshot.child("interests").value?.toString() ?: ""
+                    profileImageUrl = snapshot.child("profileImageUrl").value?.toString()
+                }
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
+            }
+    }
+
+    val activityTitle = "Volunteer Activity"
 
     Scaffold(
         topBar = {
@@ -66,7 +87,7 @@ fun VolunteerProfileViewScreen(
 
             // Profile Header
             AsyncImage(
-                model = "https://i.pravatar.cc/150?img=32",
+                model = profileImageUrl ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
                 contentDescription = null,
                 modifier = Modifier.size(120.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop
@@ -93,12 +114,16 @@ fun VolunteerProfileViewScreen(
 
             // Skills Section
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text("Skills", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
+                Text("Skills & Interests", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SkillBadge("Teaching")
-                    SkillBadge("First Aid")
-                    SkillBadge("Childcare")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val skillList = if (interests.isNotBlank()) interests.split(",").take(3).map { it.trim() } else listOf("Volunteer")
+                    skillList.forEach { skill ->
+                        SkillBadge(skill)
+                    }
                 }
             }
 

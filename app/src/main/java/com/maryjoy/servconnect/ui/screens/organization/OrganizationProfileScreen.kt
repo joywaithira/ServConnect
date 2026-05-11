@@ -21,6 +21,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.maryjoy.servconnect.ui.theme.PrimaryColor
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,11 +32,60 @@ fun OrgProfileScreen(
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit
 ) {
-    var orgName by remember { mutableStateOf("Nairobi Children's Home") }
-    var email by remember { mutableStateOf("info@nairobihome.org") }
-    var phone by remember { mutableStateOf("+254 712 345 678") }
-    var location by remember { mutableStateOf("Lower Kabete, Nairobi") }
-    var description by remember { mutableStateOf("We provide a safe haven and education for orphaned and vulnerable children.") }
+    val context = LocalContext.current
+    val auth = remember { FirebaseAuth.getInstance() }
+    val database = remember { FirebaseDatabase.getInstance() }
+    val userId = auth.currentUser?.uid
+
+    var orgName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            database.getReference("organizations").child(userId).get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.exists()) {
+                        orgName = snapshot.child("orgName").value?.toString() ?: ""
+                        email = snapshot.child("email").value?.toString() ?: ""
+                        phone = snapshot.child("phone").value?.toString() ?: ""
+                        location = snapshot.child("location").value?.toString() ?: ""
+                        description = snapshot.child("description").value?.toString() ?: ""
+                        profileImageUrl = snapshot.child("profileImageUrl").value?.toString()
+                    }
+                    isLoading = false
+                }
+                .addOnFailureListener {
+                    isLoading = false
+                    Toast.makeText(context, "Failed to load profile", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+            isLoading = false
+        }
+    }
+
+    fun saveProfile() {
+        if (userId != null) {
+            val updates = hashMapOf<String, Any>(
+                "orgName" to orgName,
+                "email" to email,
+                "phone" to phone,
+                "location" to location,
+                "description" to description
+            )
+            database.getReference("organizations").child(userId).updateChildren(updates)
+                .addOnSuccessListener {
+                    Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener {
+                    Toast.makeText(context, "Failed to update profile", Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -44,7 +97,7 @@ fun OrgProfileScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Save Changes */ }) {
+                    IconButton(onClick = { saveProfile() }) {
                         Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.White)
                     }
                 },
@@ -53,18 +106,23 @@ fun OrgProfileScreen(
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // Profile Picture
             Box(contentAlignment = Alignment.BottomEnd) {
                 AsyncImage(
-                    model = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=400",
+                    model = profileImageUrl ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
                     contentDescription = null,
                     modifier = Modifier.size(120.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
@@ -144,6 +202,7 @@ fun OrgProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
     }
 }
 

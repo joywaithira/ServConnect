@@ -24,9 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.maryjoy.servconnect.ui.theme.AccentColor
-import com.maryjoy.servconnect.ui.theme.PrimaryColor
-import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.maryjoy.servconnect.ui.theme.*
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 
 // --- DATA MODELS ---
 data class Organization(
@@ -57,77 +59,118 @@ fun OrganizationProfileViewScreen(
     onOpportunityClick: (String) -> Unit,
     onMessageClick: (String) -> Unit
 ) {
-    // Mock data for the organization
-    val organization = Organization(
-        id = orgId,
-        name = "Nairobi Children's Home",
-        description = "We provide a safe haven and education for orphaned and vulnerable children in Nairobi. Our mission is to empower the next generation through love and care.",
-        location = "Lower Kabete, Nairobi",
-        email = "info@nairobihome.org",
-        phone = "+254 712 345 678",
-        isVerified = true,
-        imageUrl = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=400",
-        remoteHelpNeeds = "We are currently in need of dry cereals, school stationery, and winter clothing. You can donate via our office or contact us for pickup."
-    )
+    val database = remember { FirebaseDatabase.getInstance() }
+    var organization by remember { mutableStateOf<Organization?>(null) }
+    var opportunities by remember { mutableStateOf<List<OrgOpportunity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
 
-    val opportunities = listOf(
-        OrgOpportunity("1", "Weekend Tutoring", "Every Sat-Sun", "Volunteer"),
-        OrgOpportunity("2", "Garden Maintenance", "May 15, 2024", "Community Service"),
-        OrgOpportunity("3", "Storytelling Session", "May 20, 2024", "Volunteer")
-    )
+    LaunchedEffect(orgId) {
+        // Fetch Organization Info
+        database.getReference("organizations").child(orgId).get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    organization = Organization(
+                        id = orgId,
+                        name = snapshot.child("orgName").value?.toString() ?: "Organization",
+                        description = snapshot.child("description").value?.toString() ?: "No description provided.",
+                        location = snapshot.child("location").value?.toString() ?: "No location",
+                        email = snapshot.child("email").value?.toString() ?: "",
+                        phone = snapshot.child("phone").value?.toString() ?: "",
+                        isVerified = true, // Simplified
+                        imageUrl = snapshot.child("profileImageUrl").value?.toString() ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                    )
+                }
+                // Don't set isLoading to false here yet, wait for opportunities
+            }
+            .addOnFailureListener {
+                // Handle failure
+            }
+
+        // Fetch Opportunities for this Organization
+        val oppQuery = database.getReference("opportunities").orderByChild("orgId").equalTo(orgId)
+        oppQuery.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val list = mutableListOf<OrgOpportunity>()
+                for (child in snapshot.children) {
+                    val id = child.child("id").value?.toString() ?: ""
+                    val title = child.child("title").value?.toString() ?: ""
+                    val date = child.child("date").value?.toString() ?: ""
+                    val type = child.child("type").value?.toString() ?: "Volunteer"
+                    list.add(OrgOpportunity(id, title, date, type))
+                }
+                opportunities = list
+                isLoading = false
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                isLoading = false
+            }
+        })
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Organization Profile", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Organization Profile", fontWeight = FontWeight.Bold, color = White) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = White)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onMessageClick(organization.name) }) {
-                        Icon(Icons.AutoMirrored.Filled.Message, contentDescription = "Message", tint = Color.White)
+                    IconButton(onClick = { organization?.let { onMessageClick(it.name) } }) {
+                        Icon(Icons.AutoMirrored.Filled.Message, contentDescription = "Message", tint = White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        containerColor = OffWhite
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // 1. Header Image & Profile Info
-            item { OrgHeader(organization) }
-
-            // 2. Contact Info
-            item { ContactSection(organization) }
-
-            // 3. Remote Help Section (If available)
-            organization.remoteHelpNeeds?.let { needs ->
-                item { RemoteHelpCard(needs) }
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
             }
-
-            // 4. Opportunities Title
-            item {
-                Text(
-                    text = "Open Opportunities",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1D1D1D),
-                    modifier = Modifier.padding(16.dp)
-                )
+        } else if (organization == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Organization not found")
             }
+        } else {
+            val org = organization!!
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // 1. Header Image & Profile Info
+                item { OrgHeader(org) }
 
-            // 5. Opportunities List
-            items(opportunities) { opportunity ->
-                OrgOpportunityItem(opportunity) { onOpportunityClick(opportunity.id) }
+                // 2. Contact Info
+                item { ContactSection(org) }
+
+                // 3. Remote Help Section (If available)
+                org.remoteHelpNeeds?.let { needs ->
+                    item { RemoteHelpCard(needs) }
+                }
+
+                // 4. Opportunities Title
+                item {
+                    Text(
+                        text = "Open Opportunities",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkGray,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                // 5. Opportunities List
+                items(opportunities) { opportunity ->
+                    OrgOpportunityItem(opportunity) { onOpportunityClick(opportunity.id) }
+                }
+
+                item { Spacer(modifier = Modifier.height(24.dp)) }
             }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
     }
 }
@@ -150,7 +193,7 @@ fun OrgHeader(org: Organization) {
                     text = org.name,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1D1D1D)
+                    color = DarkGray
                 )
                 if (org.isVerified) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -166,7 +209,7 @@ fun OrgHeader(org: Organization) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = AccentColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(text = org.location, fontSize = 14.sp, color = Color.Gray)
+                Text(text = org.location, fontSize = 14.sp, color = Gray)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -174,7 +217,7 @@ fun OrgHeader(org: Organization) {
             Text(
                 text = org.description,
                 fontSize = 14.sp,
-                color = Color.DarkGray,
+                color = DarkGray,
                 lineHeight = 20.sp
             )
         }
@@ -186,7 +229,7 @@ fun ContactSection(org: Organization) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = White)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             ContactItem(icon = Icons.Default.Email, text = org.email)
@@ -201,7 +244,7 @@ fun ContactItem(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = PrimaryColor, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(12.dp))
-        Text(text = text, fontSize = 14.sp, color = Color.DarkGray)
+        Text(text = text, fontSize = 14.sp, color = DarkGray)
     }
 }
 
@@ -222,7 +265,7 @@ fun RemoteHelpCard(needs: String) {
             Text(
                 text = needs,
                 fontSize = 14.sp,
-                color = Color.DarkGray,
+                color = DarkGray,
                 lineHeight = 20.sp
             )
         }
@@ -234,15 +277,15 @@ fun OrgOpportunityItem(opportunity: OrgOpportunity, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = White)
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(opportunity.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                    Icon(Icons.Default.Event, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.Event, contentDescription = null, tint = Gray, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(opportunity.date, fontSize = 12.sp, color = Color.Gray)
+                    Text(opportunity.date, fontSize = 12.sp, color = Gray)
                 }
             }
             Surface(

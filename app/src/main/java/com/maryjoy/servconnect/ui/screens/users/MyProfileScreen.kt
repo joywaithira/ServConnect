@@ -25,6 +25,11 @@ import coil.compose.AsyncImage
 import com.maryjoy.servconnect.ui.theme.AccentColor
 import com.maryjoy.servconnect.ui.theme.PrimaryColor
 import com.maryjoy.servconnect.ui.theme.SecondaryColor
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +39,38 @@ fun MyProfileScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val auth = remember { FirebaseAuth.getInstance() }
+    val database = remember { FirebaseDatabase.getInstance() }
+    val userId = auth.currentUser?.uid
+
+    var fullName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var interests by remember { mutableStateOf("") }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            database.getReference("volunteers").child(userId).get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.exists()) {
+                        fullName = snapshot.child("fullName").value?.toString() ?: "Volunteer"
+                        email = snapshot.child("email").value?.toString() ?: ""
+                        interests = snapshot.child("interests").value?.toString() ?: ""
+                        profileImageUrl = snapshot.child("profileImageUrl").value?.toString()
+                    }
+                    isLoading = false
+                }
+                .addOnFailureListener {
+                    isLoading = false
+                    Toast.makeText(context, "Failed to load profile", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+            isLoading = false
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -55,49 +92,55 @@ fun MyProfileScreen(
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-
-            // Profile Header (Avatar, Name, Location)
-            item { ProfileHeader() }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-
-            // Stats Row (Hours, Activities, Rating)
-            item { StatsRow() }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-
-            // Skills & Interests
-            item { SkillsAndInterestsSection() }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-
-            // Navigation Menu (Portfolio, History)
-            item {
-                MenuSection(
-                    onNavigateToPortfolio = onNavigateToPortfolio,
-                    onNavigateToHistory = onNavigateToHistory
-                )
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                item { Spacer(modifier = Modifier.height(24.dp)) }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+                // Profile Header (Avatar, Name, Location)
+                item { ProfileHeader(fullName = fullName, email = email, profileImageUrl = profileImageUrl) }
+
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+
+                // Stats Row (Hours, Activities, Rating)
+                item { StatsRow() }
+
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+
+                // Skills & Interests
+                item { SkillsAndInterestsSection(interests = interests) }
+
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+
+                // Navigation Menu (Portfolio, History)
+                item {
+                    MenuSection(
+                        onNavigateToPortfolio = onNavigateToPortfolio,
+                        onNavigateToHistory = onNavigateToHistory
+                    )
+                }
+
+                item { Spacer(modifier = Modifier.height(32.dp)) }
+            }
         }
     }
 }
 
 @Composable
-fun ProfileHeader() {
+fun ProfileHeader(fullName: String, email: String, profileImageUrl: String?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         // Avatar
         AsyncImage(
-            model = "https://i.pravatar.cc/150?img=32", // Placeholder image
+            model = profileImageUrl ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png", // Default avatar if none
             contentDescription = "Profile Picture",
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -109,11 +152,19 @@ fun ProfileHeader() {
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Jane Doe",
+            text = fullName,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF1D1D1D)
         )
+
+        Text(
+            text = email,
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -180,8 +231,8 @@ fun StatItem(value: String, label: String, icon: ImageVector, isRating: Boolean 
 }
 
 @Composable
-fun SkillsAndInterestsSection() {
-    val skills = listOf("Childcare", "Teaching", "First Aid", "Event Organizing", "Elderly Care")
+fun SkillsAndInterestsSection(interests: String) {
+    val skills = if (interests.isNotBlank()) interests.split(",").map { it.trim() } else emptyList()
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "Skills & Interests",

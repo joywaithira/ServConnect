@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.maryjoy.servconnect.ui.theme.AccentColor
 import com.maryjoy.servconnect.ui.theme.PrimaryColor
 import com.maryjoy.servconnect.ui.theme.SecondaryColor
@@ -49,61 +51,103 @@ fun VolunteerHomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToExplore: () -> Unit
 ) {
-    val recommendedOpportunities = listOf(
-        Opportunity("1", "Teaching Kids", "Nairobi Children's Home", "Nairobi", "Volunteer", "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=400"),
-        Opportunity("2", "Tree Planting", "Green Earth NGO", "Kiambu", "Community Service", "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=400"),
-        Opportunity("3", "Elderly Care", "Golden Years Home", "Nairobi", "Volunteer", "https://images.unsplash.com/photo-1581578731522-a00465a04421?auto=format&fit=crop&w=400")
-    )
+    val auth = remember { FirebaseAuth.getInstance() }
+    val database = remember { FirebaseDatabase.getInstance() }
+    val userId = auth.currentUser?.uid
+
+    var userName by remember { mutableStateOf("User") }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
+    var recommendedOpportunities by remember { mutableStateOf<List<Opportunity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            database.getReference("volunteers").child(userId).get().addOnSuccessListener { snapshot ->
+                userName = snapshot.child("fullName").value?.toString()?.split(" ")?.firstOrNull() ?: "User"
+                profileImageUrl = snapshot.child("profileImageUrl").value?.toString()
+            }
+        }
+
+        // Fetch all opportunities for the home screen
+        database.getReference("opportunities").get().addOnSuccessListener { snapshot ->
+            val list = mutableListOf<Opportunity>()
+            for (child in snapshot.children) {
+                list.add(Opportunity(
+                    id = child.child("id").value?.toString() ?: "",
+                    title = child.child("title").value?.toString() ?: "",
+                    organization = child.child("organization").value?.toString() ?: "",
+                    location = child.child("location").value?.toString() ?: "",
+                    type = child.child("type").value?.toString() ?: "Volunteer",
+                    imageUrl = child.child("imageUrl").value?.toString() ?: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=400"
+                ))
+            }
+            recommendedOpportunities = list
+            isLoading = false
+        }.addOnFailureListener {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
             HomeTopBar(
                 onProfileClick = onNavigateToProfile,
-                onNotificationClick = onNavigateToNotifications
+                onNotificationClick = onNavigateToNotifications,
+                profileImageUrl = profileImageUrl
             )
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // 1. Welcome Header
-            item { WelcomeHeader(userName = "Jane") }
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // 1. Welcome Header
+                item { WelcomeHeader(userName = userName) }
 
-            // 2. Search Bar
-            item { SearchBarSection() }
+                // 2. Search Bar
+                item { SearchBarSection() }
 
-            // 3. Quick Action: QR Check-in Card
-            item { QrQuickActionCard(onClick = onNavigateToQrCheckIn) }
+                // 3. Quick Action: QR Check-in Card
+                item { QrQuickActionCard(onClick = onNavigateToQrCheckIn) }
 
-            // 4. Categories Row
-            item { CategorySection() }
+                // 4. Categories Row
+                item { CategorySection() }
 
-            // 5. Recommended Section
-            item {
-                SectionTitle(title = "Recommended for You", onSeeAllClick = onNavigateToExplore)
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(bottom = 24.dp)
-                ) {
-                    items(recommendedOpportunities) { opportunity ->
-                        OpportunityCard(opportunity, onClick = { onNavigateToDetails(opportunity.id) })
+                // 5. Recommended Section
+                item {
+                    SectionTitle(title = "Recommended for You", onSeeAllClick = onNavigateToExplore)
+                    if (recommendedOpportunities.isEmpty()) {
+                        Text("No opportunities found.", modifier = Modifier.padding(16.dp), color = Color.Gray)
+                    } else {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        ) {
+                            items(recommendedOpportunities) { opportunity ->
+                                OpportunityCard(opportunity, onClick = { onNavigateToDetails(opportunity.id) })
+                            }
+                        }
                     }
                 }
-            }
 
-            // 6. Nearby Section
-            item {
-                SectionTitle(title = "Nearby Opportunities", onSeeAllClick = onNavigateToExplore)
-            }
-            items(recommendedOpportunities.reversed()) { opportunity ->
-                NearbyOpportunityItem(opportunity, onClick = { onNavigateToDetails(opportunity.id) })
-            }
+                // 6. Nearby Section
+                item {
+                    SectionTitle(title = "Nearby Opportunities", onSeeAllClick = onNavigateToExplore)
+                }
+                items(recommendedOpportunities.reversed()) { opportunity ->
+                    NearbyOpportunityItem(opportunity, onClick = { onNavigateToDetails(opportunity.id) })
+                }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+            }
         }
     }
 }
@@ -112,7 +156,7 @@ fun VolunteerHomeScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopBar(onProfileClick: () -> Unit, onNotificationClick: () -> Unit) {
+fun HomeTopBar(onProfileClick: () -> Unit, onNotificationClick: () -> Unit, profileImageUrl: String?) {
     CenterAlignedTopAppBar(
         title = {
             Text("ServConnect", fontWeight = FontWeight.ExtraBold, color = PrimaryColor, fontSize = 20.sp)
@@ -123,7 +167,7 @@ fun HomeTopBar(onProfileClick: () -> Unit, onNotificationClick: () -> Unit) {
             }
             IconButton(onClick = onProfileClick) {
                 AsyncImage(
-                    model = "https://i.pravatar.cc/150?img=32",
+                    model = profileImageUrl ?: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
                     contentDescription = "Profile",
                     modifier = Modifier.size(32.dp).clip(CircleShape)
                 )

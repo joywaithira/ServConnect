@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.maryjoy.servconnect.ui.screens.users.OpportunityDetailScreen
 import com.maryjoy.servconnect.ui.theme.PrimaryColor
+import com.google.firebase.database.FirebaseDatabase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +33,38 @@ fun OrgOpportunityDetailScreen(
     onManageBookingsClick: () -> Unit,
     onViewQrCodeClick: () -> Unit
 ) {
+    val database = remember { FirebaseDatabase.getInstance() }
+    var title by remember { mutableStateOf("Loading...") }
+    var date by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var slotsFilled by remember { mutableStateOf(0) }
+    var totalSlots by remember { mutableStateOf(0) }
+    var status by remember { mutableStateOf("Open") }
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(opportunityId) {
+        database.getReference("opportunities").child(opportunityId).get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    title = snapshot.child("title").value?.toString() ?: ""
+                    date = snapshot.child("date").value?.toString() ?: ""
+                    location = snapshot.child("location").value?.toString() ?: ""
+                    description = snapshot.child("description").value?.toString() ?: ""
+                    totalSlots = (snapshot.child("totalSlots").value as? Long)?.toInt() ?: 0
+                    val spotsLeft = (snapshot.child("spotsLeft").value as? Long)?.toInt() ?: 0
+                    slotsFilled = totalSlots - spotsLeft
+                    status = snapshot.child("status").value?.toString() ?: "Open"
+                    imageUrl = snapshot.child("imageUrl").value?.toString()
+                }
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
+            }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -51,89 +84,95 @@ fun OrgOpportunityDetailScreen(
         },
         containerColor = Color(0xFFF8F9FA)
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // 1. Header Image
-            AsyncImage(
-                model = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800",
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                contentScale = ContentScale.Crop
-            )
-
-            Column(modifier = Modifier.padding(16.dp)) {
-                // 2. Title and Status
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Weekend Tutoring", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = PrimaryColor.copy(alpha = 0.1f)
-                    ) {
-                        Text("Open", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = PrimaryColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 3. Info Row (Date, Location, Slots)
-                InfoRow(icon = Icons.Default.CalendarToday, text = "May 12, 2024")
-                InfoRow(icon = Icons.Default.LocationOn, text = "Nairobi Children's Home")
-                InfoRow(icon = Icons.Default.People, text = "8 / 10 Slots Filled")
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // 4. Description
-                Text("Description", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "We are looking for passionate volunteers to help tutor children in basic mathematics and English. No prior teaching experience is required, just a willing heart!",
-                    fontSize = 14.sp, color = Color.DarkGray, lineHeight = 20.sp
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryColor)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // 1. Header Image
+                AsyncImage(
+                    model = imageUrl ?: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800",
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentScale = ContentScale.Crop
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // 2. Title and Status
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PrimaryColor.copy(alpha = 0.1f)
+                        ) {
+                            Text(status, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = PrimaryColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
 
-                // 5. Action Buttons
-                Button(
-                    onClick = onManageBookingsClick,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor)
-                ) {
-                    Icon(Icons.Default.Group, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Manage Bookings", fontWeight = FontWeight.Bold)
-                }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    // 3. Info Row (Date, Location, Slots)
+                    InfoRow(icon = Icons.Default.CalendarToday, text = date)
+                    InfoRow(icon = Icons.Default.LocationOn, text = location)
+                    InfoRow(icon = Icons.Default.People, text = "$slotsFilled / $totalSlots Slots Filled")
 
-                Button(
-                    onClick = onViewQrCodeClick,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                ) {
-                    Icon(Icons.Default.QrCode, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("View QR Code", fontWeight = FontWeight.Bold)
-                }
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    // 4. Description
+                    Text("Description", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D1D1D))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        description,
+                        fontSize = 14.sp, color = Color.DarkGray, lineHeight = 20.sp
+                    )
 
-                OutlinedButton(
-                    onClick = { /* Close Opportunity */ },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
-                ) {
-                    Text("Close Opportunity", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // 5. Action Buttons
+                    Button(
+                        onClick = onManageBookingsClick,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor)
+                    ) {
+                        Icon(Icons.Default.Group, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Manage Bookings", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = onViewQrCodeClick,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Icon(Icons.Default.QrCode, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View QR Code", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { /* Close Opportunity */ },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                    ) {
+                        Text("Close Opportunity", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
